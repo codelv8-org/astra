@@ -1,0 +1,14 @@
+PRAGMA foreign_keys = ON;
+CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY);
+CREATE TABLE IF NOT EXISTS agents(id TEXT PRIMARY KEY, record TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS projects(id TEXT PRIMARY KEY, name TEXT NOT NULL, goal TEXT NOT NULL, path TEXT NOT NULL UNIQUE COLLATE NOCASE, is_git INTEGER NOT NULL, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS tasks(id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id), agent_id TEXT NOT NULL REFERENCES agents(id), status TEXT NOT NULL CHECK(status IN ('draft','ready','queued','running','blocked','needs_review','completed','failed','canceled')));
+CREATE TABLE IF NOT EXISTS executions(id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id), agent_id TEXT NOT NULL REFERENCES agents(id), task_id TEXT NOT NULL REFERENCES tasks(id), adapter TEXT NOT NULL, prompt TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, finished_at TEXT, error TEXT, pid INTEGER, session_id TEXT);
+CREATE UNIQUE INDEX IF NOT EXISTS one_run_per_project ON executions(project_id) WHERE status='running';
+CREATE UNIQUE INDEX IF NOT EXISTS one_run_per_agent ON executions(agent_id) WHERE status='running';
+CREATE TABLE IF NOT EXISTS execution_events(id INTEGER PRIMARY KEY AUTOINCREMENT, execution_id TEXT NOT NULL REFERENCES executions(id), kind TEXT NOT NULL, text TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS execution_events_run ON execution_events(execution_id,id);
+CREATE TABLE IF NOT EXISTS approvals(id TEXT PRIMARY KEY, execution_id TEXT NOT NULL UNIQUE REFERENCES executions(id), prompt_hash TEXT NOT NULL, executable TEXT NOT NULL, scope TEXT NOT NULL CHECK(scope='read-only'), approved_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS audit_logs(id TEXT PRIMARY KEY, action TEXT NOT NULL, subject_id TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS runtime_configs(adapter TEXT PRIMARY KEY, executable TEXT NOT NULL, sha256 TEXT NOT NULL);
+INSERT OR IGNORE INTO schema_migrations(version) VALUES(1);

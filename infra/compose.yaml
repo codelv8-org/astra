@@ -1,0 +1,46 @@
+services:
+  postgres:
+    image: postgres:18.4
+    environment:
+      POSTGRES_USER: crewnest
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_DB: crewnest
+    volumes:
+      - central-data:/var/lib/postgresql
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U crewnest -d crewnest]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  api:
+    build:
+      context: ..
+      dockerfile: infra/api.Dockerfile
+    environment:
+      DATABASE_URL: postgresql://crewnest:${POSTGRES_PASSWORD}@postgres:5432/crewnest
+      WEB_ORIGIN: ${WEB_ORIGIN:?Set HTTPS WEB_ORIGIN}
+      TLS_KEY: /tls/api.key
+      TLS_CERT: /tls/api.crt
+      HOST: 0.0.0.0
+      PORT: 7443
+    volumes:
+      - ${TLS_DIRECTORY:?Set TLS_DIRECTORY}:/tls:ro
+    ports:
+      - 127.0.0.1:7443:7443
+    depends_on:
+      postgres:
+        condition: service_healthy
+  web:
+    build:
+      context: ..
+      dockerfile: infra/web.Dockerfile
+    environment:
+      API_TLS_NAME: ${API_TLS_NAME:?Set API certificate DNS name}
+    volumes:
+      - ${TLS_DIRECTORY}:/tls:ro
+    ports:
+      - 127.0.0.1:7444:443
+    depends_on:
+      - api
+volumes:
+  central-data:

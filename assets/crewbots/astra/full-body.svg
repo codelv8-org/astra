@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 280" role="img" aria-labelledby="title desc">
+<title id="title">ASTRA — full-body</title>
+<desc id="desc">หุ่นยนต์ CrewBot ต้นฉบับ สถานะ full-body พื้นหลังโปร่งใส</desc>
+<defs><linearGradient id="shell" x2="0.35" y2="1"><stop stop-color="#F2C75C"/><stop offset="0.38" stop-color="#4169E1"/><stop offset="1" stop-color="#4169E1"/></linearGradient></defs>
+<style>@media(prefers-reduced-motion:reduce){.bot,.pulse,.status{animation:none!important}}</style>
+<g stroke="#24354B" stroke-width="4" stroke-linejoin="round" stroke-linecap="round">
+<g class="bot"><g fill="url(#shell)"><rect x="81" y="158" width="78" height="76" rx="29"/>
+      <path d="M79 173q-20-6-22 22v15h16v-17l11-5M161 173q20-6 22 22v15h-16v-17l-11-5"/>
+      <rect x="84" y="229" width="25" height="27" rx="10"/><rect x="131" y="229" width="25" height="27" rx="10"/>
+      <rect x="77" y="250" width="36" height="15" rx="7" fill="#F2C75C"/><rect x="127" y="250" width="36" height="15" rx="7" fill="#F2C75C"/>
+      <circle cx="65" cy="213" r="10" fill="#F2C75C"/><circle cx="175" cy="213" r="10" fill="#F2C75C"/>
+      </g><g fill="#F2C75C" stroke="#F2C75C" stroke-width="3"><ellipse cx="120" cy="194" rx="23" ry="11" fill="none"/><circle cx="120" cy="194" r="7"/></g><g fill="#4169E1"><path d="M120 41V30"/><path fill="#F2C75C" d="m120 13 5 10 11 2-8 8 2 11-10-5-10 5 2-11-8-8 11-2Z"/></g><g fill="url(#shell)"><rect x="43" y="40" width="154" height="113" rx="49"/></g>
+<rect x="60" y="66" width="120" height="68" rx="20" fill="#152B42"/>
+<g fill="none" stroke="#E5F8FF" stroke-width="4"><path d="M82 95q7-7 14 0m48 0q7-7 14 0"/><path d="M110 117q10 7 20 0"/></g>
+</g></g></svg>

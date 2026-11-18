@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 280" role="img" aria-labelledby="title desc">
+<title id="title">FORGE — error</title>
+<desc id="desc">หุ่นยนต์ CrewBot ต้นฉบับ สถานะ error พื้นหลังโปร่งใส</desc>
+<defs><linearGradient id="shell" x2="0.35" y2="1"><stop stop-color="#FFE0A3"/><stop offset="0.38" stop-color="#E98B3A"/><stop offset="1" stop-color="#E98B3A"/></linearGradient></defs>
+<style>@media(prefers-reduced-motion:reduce){.bot,.pulse,.status{animation:none!important}}</style>
+<g stroke="#24354B" stroke-width="4" stroke-linejoin="round" stroke-linecap="round">
+<g class="bot"><g fill="url(#shell)"><rect x="79" y="158" width="82" height="76" rx="16"/>
+      <path d="M79 173q-20-6-22 22v15h16v-17l11-5M161 173q20-6 22 22v15h-16v-17l-11-5"/>
+      <rect x="84" y="229" width="25" height="27" rx="10"/><rect x="131" y="229" width="25" height="27" rx="10"/>
+      <rect x="77" y="250" width="36" height="15" rx="7" fill="#FFE0A3"/><rect x="127" y="250" width="36" height="15" rx="7" fill="#FFE0A3"/>
+      <circle cx="65" cy="213" r="10" fill="#FFE0A3"/><circle cx="175" cy="213" r="10" fill="#FFE0A3"/>
+      </g><g fill="#FFE0A3" stroke="#FFE0A3" stroke-width="3"><rect x="94" y="175" width="52" height="32" rx="6" fill="#152B42"/><path d="m102 184 6 6-6 6m14 1h13" fill="none" stroke="#FFE0A3" stroke-width="3"/></g><path d="M57 215v9m16-9v9m94-9v9m16-9v9" stroke-width="4"/><g fill="#E98B3A"><path d="M88 41V27h24"/><rect x="108" y="22" width="15" height="10" rx="3" fill="#FFE0A3"/></g><g fill="url(#shell)"><rect x="43" y="40" width="154" height="113" rx="24"/></g>
+<rect x="60" y="66" width="120" height="68" rx="12" fill="#152B42"/>
+<g fill="none" stroke="#E5F8FF" stroke-width="4"><path d="m81 92 17-6m44 0 17 6M85 101h9m52 0h9"/><path d="M110 122q10-10 20 0"/></g>
+</g><g class="status" fill="#FFE0A3" stroke="#FFE0A3" stroke-width="3"><path d="m204 205 17 29h-34Z" fill="#4B3440"/><path d="M204 215v8m0 5v1" stroke="#FFE0CB"/></g></g></svg>

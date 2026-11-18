@@ -1,0 +1,10 @@
+CREATE TABLE IF NOT EXISTS users(id uuid PRIMARY KEY,name text NOT NULL UNIQUE,password text NOT NULL);
+CREATE TABLE IF NOT EXISTS sessions(hash text PRIMARY KEY,user_id uuid NOT NULL REFERENCES users(id),csrf text NOT NULL,expires timestamptz NOT NULL);
+CREATE TABLE IF NOT EXISTS devices(id uuid PRIMARY KEY,owner_id uuid NOT NULL REFERENCES users(id),name text NOT NULL,credential_hash text NOT NULL,revoked boolean NOT NULL DEFAULT false,last_seen timestamptz,snapshot jsonb NOT NULL DEFAULT '{}');
+CREATE TABLE IF NOT EXISTS pairings(hash text PRIMARY KEY,owner_id uuid NOT NULL REFERENCES users(id),expires timestamptz NOT NULL);
+CREATE TABLE IF NOT EXISTS device_connections(id uuid PRIMARY KEY,device_id uuid NOT NULL REFERENCES devices(id),connected timestamptz NOT NULL,disconnected timestamptz);
+CREATE TABLE IF NOT EXISTS projects(device_id uuid NOT NULL REFERENCES devices(id),id uuid NOT NULL,name text NOT NULL,PRIMARY KEY(device_id,id));
+CREATE TABLE IF NOT EXISTS commands(id uuid PRIMARY KEY,device_id uuid NOT NULL REFERENCES devices(id),owner_id uuid NOT NULL REFERENCES users(id),key text NOT NULL,envelope jsonb NOT NULL,state text NOT NULL,result jsonb,expires timestamptz NOT NULL,UNIQUE(owner_id,device_id,key));
+CREATE TABLE IF NOT EXISTS execution_events(device_id uuid NOT NULL REFERENCES devices(id),id text NOT NULL,execution_id uuid NOT NULL,kind text NOT NULL,text text NOT NULL,PRIMARY KEY(device_id,id));
+CREATE TABLE IF NOT EXISTS audit_logs(id uuid PRIMARY KEY,owner_id uuid REFERENCES users(id),device_id uuid REFERENCES devices(id),action text NOT NULL,created timestamptz NOT NULL);
+CREATE INDEX IF NOT EXISTS commands_expiry ON commands(state,expires);

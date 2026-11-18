@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 280" role="img" aria-labelledby="title desc">
+<title id="title">SCOUT — idle</title>
+<desc id="desc">หุ่นยนต์ CrewBot ต้นฉบับ สถานะ idle พื้นหลังโปร่งใส</desc>
+<defs><linearGradient id="shell" x2="0.35" y2="1"><stop stop-color="#D5E89B"/><stop offset="0.38" stop-color="#879B4A"/><stop offset="1" stop-color="#879B4A"/></linearGradient></defs>
+<style>.bot{animation:float 3.2s ease-in-out infinite}@keyframes float{50%{transform:translateY(-2px)}}@media(prefers-reduced-motion:reduce){.bot,.pulse,.status{animation:none!important}}</style>
+<g stroke="#24354B" stroke-width="4" stroke-linejoin="round" stroke-linecap="round">
+<g class="bot"><g fill="url(#shell)"><rect x="82" y="162" width="76" height="65" rx="25"/>
+      <path d="M79 173q-20-6-22 22v15h16v-17l11-5M161 173q20-6 22 22v15h-16v-17l-11-5"/>
+      <rect x="84" y="229" width="25" height="27" rx="10"/><rect x="131" y="229" width="25" height="27" rx="10"/>
+      <rect x="77" y="250" width="36" height="15" rx="7" fill="#D5E89B"/><rect x="127" y="250" width="36" height="15" rx="7" fill="#D5E89B"/>
+      <circle cx="65" cy="213" r="10" fill="#D5E89B"/><circle cx="175" cy="213" r="10" fill="#D5E89B"/>
+      </g><g fill="#D5E89B" stroke="#D5E89B" stroke-width="3"><circle cx="120" cy="191" r="18"/><path d="M120 179v24m-12-12h24" stroke="#879B4A"/></g><g fill="#879B4A"><path d="M153 49V33l12-5"/><circle cx="169" cy="27" r="6" fill="#D5E89B"/></g><g fill="url(#shell)"><rect x="42" y="48" width="156" height="99" rx="45"/></g>
+<rect x="60" y="66" width="120" height="68" rx="20" fill="#152B42"/>
+<g fill="none" stroke="#E5F8FF" stroke-width="4"><circle cx="91" cy="96" r="23" fill="#24435A" stroke="#D5E89B" stroke-width="6"/><circle cx="91" cy="96" r="12" fill="#BCE8EE" stroke="none"/><circle cx="95" cy="91" r="4" fill="white" stroke="none"/><path d="M145 96h12"/><path d="M110 117q10 7 20 0"/></g>
+</g><g class="status" fill="#D5E89B" stroke="#D5E89B" stroke-width="3"><circle cx="204" cy="225" r="4"/></g></g></svg>

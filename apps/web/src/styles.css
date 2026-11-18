@@ -1,0 +1,357 @@
+@import "tailwindcss";
+@font-face {
+  font-family: LineSeed;
+  src: url("/fonts/LINESeedSansTH_W_Rg.woff2") format("woff2");
+  font-display: swap;
+}
+:root {
+  font-family: LineSeed, system-ui, sans-serif;
+  color-scheme: dark;
+  --bg: #0b1020;
+  --surface: #151d2f;
+  --elevated: #202a40;
+  --text: #f4f7fb;
+  --muted: #a4b1c6;
+  --border: #34415a;
+  --primary: #8caeff;
+  --ux-bg: var(--bg);
+  --ux-surface: var(--surface);
+  --ux-surface-2: var(--elevated);
+  --ux-text: var(--text);
+  --ux-text-2: var(--muted);
+  --ux-text-3: var(--muted);
+  --ux-line: var(--border);
+  --ux-line-strong: var(--border);
+  --ux-accent: var(--primary);
+  --ux-accent-ink: #081126;
+  --ux-accent-soft: var(--elevated);
+  --ux-shadow: 0 10px 30px #0002;
+  --ux-radius: 16px;
+  --ux-radius-sm: 10px;
+  --ux-font: LineSeed, system-ui;
+  --ux-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ux-dur: 240ms;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #eef2f9;
+  --surface: #fff;
+  --elevated: #e6edf9;
+  --text: #1d2b44;
+  --muted: #52647d;
+  --border: #bac6da;
+  --primary: #345bc0;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid var(--border);
+  padding: 20px max(20px, calc((100vw - 1440px) / 2));
+  position: relative;
+  background: var(--surface);
+}
+.brand {
+  font-size: 24px;
+  letter-spacing: -1px;
+  margin-right: auto;
+  color: inherit;
+  text-decoration: none;
+  font-weight: 700;
+}
+.brand span {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--muted);
+}
+main {
+  max-width: 1480px;
+  margin: auto;
+  padding: 36px 24px;
+}
+h1 {
+  font-size: clamp(26px, 3vw, 42px);
+  margin: 8px 0;
+}
+h2 {
+  font-size: 20px;
+}
+h3 {
+  font-size: 17px;
+}
+p {
+  color: var(--muted);
+  line-height: 1.7;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--elevated);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 10px 16px;
+  min-height: 44px;
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 3px;
+}
+.primary {
+  background: var(--primary);
+  color: var(--bg);
+  font-weight: 700;
+}
+.heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 2px;
+}
+.login {
+  max-width: 510px;
+  margin: 6vh auto;
+}
+.login form {
+  display: grid;
+  gap: 14px;
+}
+label {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+}
+input,
+select,
+textarea {
+  width: 100%;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 12px;
+  min-height: 44px;
+}
+textarea {
+  resize: vertical;
+}
+.device-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 16px;
+  margin: 28px 0;
+}
+.device {
+  text-align: left;
+  display: grid;
+  gap: 8px;
+  background: var(--surface);
+}
+.device.selected {
+  border: 2px solid var(--primary);
+}
+.device small,
+small {
+  color: var(--muted);
+}
+.dot {
+  height: 8px;
+  width: 8px;
+  border-radius: 50%;
+  background: #78899e;
+}
+.dot.on {
+  background: #5ed7a8;
+}
+.statusbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 24px 0;
+}
+.statusbar span {
+  margin-right: auto;
+}
+.crew {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  margin: 24px 0;
+}
+.crew article {
+  padding: 16px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 16px;
+}
+.crew img {
+  width: 80px;
+  height: 80px;
+}
+.crew p {
+  font-size: 12px;
+  margin: 4px 0;
+}
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: 20px;
+}
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 24px;
+  margin-bottom: 24px;
+  min-width: 0;
+}
+.task {
+  border-top: 1px solid var(--border);
+  padding: 18px 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.task p {
+  margin: 4px 0;
+}
+.actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.command {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.command small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.logs {
+  max-height: 440px;
+  overflow: auto;
+  background: var(--bg);
+  padding: 16px;
+  border-radius: 12px;
+}
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font:
+    13px/1.7 ui-monospace,
+    monospace;
+}
+.empty {
+  padding: 28px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+}
+[role="alert"] {
+  border-left: 4px solid #f5a1a1;
+  padding: 12px;
+  color: var(--text);
+  background: var(--surface);
+}
+[role="status"] {
+  border-left: 4px solid #6fd5b1;
+  padding: 12px;
+}
+dialog {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  width: min(660px, calc(100vw - 32px));
+  max-height: 90dvh;
+  overflow: auto;
+  padding: 26px;
+}
+dialog::backdrop {
+  background: #0009;
+}
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.ux {
+  font-family: inherit;
+}
+.u039 {
+  max-width: 100%;
+}
+@media (max-width: 800px) {
+  .columns {
+    grid-template-columns: 1fr;
+  }
+  .crew {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .heading {
+    align-items: start;
+    flex-direction: column;
+  }
+  main {
+    padding: 20px 16px;
+  }
+  .statusbar span {
+    width: 100%;
+  }
+}
+@media (max-width: 450px) {
+  .crew {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  header {
+    padding: 14px;
+    gap: 8px;
+  }
+  .brand {
+    font-size: 20px;
+  }
+  header button {
+    padding: 8px;
+  }
+  .panel {
+    padding: 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

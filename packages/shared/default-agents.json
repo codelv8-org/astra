@@ -1,0 +1,154 @@
+[
+  {
+    "id": "astra",
+    "name": "ASTRA",
+    "characterKey": "astra",
+    "role": "CEO / Orchestrator",
+    "description": "Receive objectives, analyze goals, create high-level plans, break requirements into tasks, assign specialists, track blockers and progress, coordinate reviews and revisions, and produce executive summaries. Never bypass required human approvals.",
+    "supervisorId": null,
+    "runtimeAdapter": "codex",
+    "model": null,
+    "workspacePermissions": [
+      "approved-projects:read-only"
+    ],
+    "instructions": "Receive objectives, analyze goals, create high-level plans, break requirements into tasks, assign specialists, track blockers and progress, coordinate reviews and revisions, and produce executive summaries. Never bypass required human approvals.",
+    "capabilities": [
+      "planning",
+      "task_assignment",
+      "coordination",
+      "executive_summary"
+    ],
+    "executionSettings": {
+      "sandbox": "read-only",
+      "timeoutSeconds": 120
+    },
+    "concurrencyLimit": 1,
+    "status": "idle",
+    "assignedTaskId": null,
+    "sessionId": null,
+    "lastHeartbeat": null,
+    "usage": null,
+    "runHistory": []
+  },
+  {
+    "id": "forge",
+    "name": "FORGE",
+    "characterKey": "forge",
+    "role": "Software Engineering Lead",
+    "description": "Implement application features and frontend/backend code, fix bugs, refactor, maintain coding standards, implement approved architecture and UI specifications, and produce change summaries with execution evidence.",
+    "supervisorId": "astra",
+    "runtimeAdapter": "claude",
+    "model": null,
+    "workspacePermissions": [
+      "approved-projects:read-only"
+    ],
+    "instructions": "Implement application features and frontend/backend code, fix bugs, refactor, maintain coding standards, implement approved architecture and UI specifications, and produce change summaries with execution evidence.",
+    "capabilities": [
+      "implementation",
+      "refactoring",
+      "bug_fixing"
+    ],
+    "executionSettings": {
+      "sandbox": "read-only",
+      "timeoutSeconds": 120
+    },
+    "concurrencyLimit": 1,
+    "status": "idle",
+    "assignedTaskId": null,
+    "sessionId": null,
+    "lastHeartbeat": null,
+    "usage": null,
+    "runHistory": []
+  },
+  {
+    "id": "mira",
+    "name": "MIRA",
+    "characterKey": "mira",
+    "role": "UI/UX Design Lead",
+    "description": "Analyze UX requirements, propose layouts and component structures, create UI specifications, define design tokens and interaction states, design responsive interfaces, and deliver implementation-ready handoff artifacts. Use documented CLI interfaces, never undocumented IDE automation.",
+    "supervisorId": "astra",
+    "runtimeAdapter": "antigravity",
+    "model": null,
+    "workspacePermissions": [
+      "approved-projects:read-only"
+    ],
+    "instructions": "Analyze UX requirements, propose layouts and component structures, create UI specifications, define design tokens and interaction states, design responsive interfaces, and deliver implementation-ready handoff artifacts. Use documented CLI interfaces, never undocumented IDE automation.",
+    "capabilities": [
+      "ux_research",
+      "ui_specification",
+      "design_handoff"
+    ],
+    "executionSettings": {
+      "sandbox": "read-only",
+      "timeoutSeconds": 120
+    },
+    "concurrencyLimit": 1,
+    "status": "idle",
+    "assignedTaskId": null,
+    "sessionId": null,
+    "lastHeartbeat": null,
+    "usage": null,
+    "runHistory": []
+  },
+  {
+    "id": "vector",
+    "name": "VECTOR",
+    "characterKey": "vector",
+    "role": "System Architect & Researcher",
+    "description": "Analyze technical requirements, research approaches with available authorized tools, design architecture, produce database and API specifications, identify technical and security risks, review feasibility and dependencies, and create architecture decision records.",
+    "supervisorId": "astra",
+    "runtimeAdapter": "codex",
+    "model": null,
+    "workspacePermissions": [
+      "approved-projects:read-only"
+    ],
+    "instructions": "Analyze technical requirements, research approaches with available authorized tools, design architecture, produce database and API specifications, identify technical and security risks, review feasibility and dependencies, and create architecture decision records.",
+    "capabilities": [
+      "architecture",
+      "research",
+      "risk_review",
+      "adr"
+    ],
+    "executionSettings": {
+      "sandbox": "read-only",
+      "timeoutSeconds": 120
+    },
+    "concurrencyLimit": 1,
+    "status": "idle",
+    "assignedTaskId": null,
+    "sessionId": null,
+    "lastHeartbeat": null,
+    "usage": null,
+    "runHistory": []
+  },
+  {
+    "id": "scout",
+    "name": "SCOUT",
+    "characterKey": "scout",
+    "role": "Reviewer, QA & UAT Lead",
+    "description": "Review changes, execute authorized automated tests, perform static analysis and regression checks, identify bugs and vulnerabilities, compare against acceptance criteria, produce QA and UAT preparation reports, and recommend rework. Final UAT approval belongs only to the human owner.",
+    "supervisorId": "astra",
+    "runtimeAdapter": "codex",
+    "model": null,
+    "workspacePermissions": [
+      "approved-projects:read-only"
+    ],
+    "instructions": "Review changes, execute authorized automated tests, perform static analysis and regression checks, identify bugs and vulnerabilities, compare against acceptance criteria, produce QA and UAT preparation reports, and recommend rework. Final UAT approval belongs only to the human owner.",
+    "capabilities": [
+      "review",
+      "authorized_testing",
+      "qa_report"
+    ],
+    "executionSettings": {
+      "sandbox": "read-only",
+      "timeoutSeconds": 120
+    },
+    "concurrencyLimit": 1,
+    "status": "idle",
+    "assignedTaskId": null,
+    "sessionId": null,
+    "lastHeartbeat": null,
+    "usage": null,
+    "runHistory": []
+  }
+]

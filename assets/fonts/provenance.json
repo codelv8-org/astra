@@ -1,0 +1,16 @@
+[
+  {
+    "file": "assets/fonts/LINESeedSansTH_W_Bd.woff2",
+    "sha256": "63a428a7989a73de4e908092717de3a70a2c128b7b01b35a3821f39db22a2003",
+    "source": "https://seed.line.me/src/images/fonts/LINE_Seed_Sans_TH.zip",
+    "license": "SIL OFL 1.1",
+    "modified": false
+  },
+  {
+    "file": "assets/fonts/LINESeedSansTH_W_Rg.woff2",
+    "sha256": "caf74c95ba957707253e40747d8364c937970df80551ab0766afc073d1fd90d6",
+    "source": "https://seed.line.me/src/images/fonts/LINE_Seed_Sans_TH.zip",
+    "license": "SIL OFL 1.1",
+    "modified": false
+  }
+]

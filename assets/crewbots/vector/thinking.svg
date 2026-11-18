@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 280" role="img" aria-labelledby="title desc">
+<title id="title">VECTOR — thinking</title>
+<desc id="desc">หุ่นยนต์ CrewBot ต้นฉบับ สถานะ thinking พื้นหลังโปร่งใส</desc>
+<defs><linearGradient id="shell" x2="0.35" y2="1"><stop stop-color="#A6F0E8"/><stop offset="0.38" stop-color="#36B7B0"/><stop offset="1" stop-color="#36B7B0"/></linearGradient></defs>
+<style>.pulse{animation:pulse 1.8s ease-in-out infinite}@keyframes pulse{50%{opacity:.4}}@media(prefers-reduced-motion:reduce){.bot,.pulse,.status{animation:none!important}}</style>
+<g stroke="#24354B" stroke-width="4" stroke-linejoin="round" stroke-linecap="round">
+<g class="bot"><g fill="url(#shell)"><path d="M95 158h50l19 26-8 46H84l-8-46Z"/>
+      <path d="M79 173q-20-6-22 22v15h16v-17l11-5M161 173q20-6 22 22v15h-16v-17l-11-5"/>
+      <rect x="84" y="229" width="25" height="27" rx="10"/><rect x="131" y="229" width="25" height="27" rx="10"/>
+      <rect x="77" y="250" width="36" height="15" rx="7" fill="#A6F0E8"/><rect x="127" y="250" width="36" height="15" rx="7" fill="#A6F0E8"/>
+      <circle cx="65" cy="213" r="10" fill="#A6F0E8"/><circle cx="175" cy="213" r="10" fill="#A6F0E8"/>
+      </g><g fill="#A6F0E8" stroke="#A6F0E8" stroke-width="3"><path d="m120 178 19 10v19l-19 10-19-10v-19Zm0 20 19-10m-19 10-19-10m19 10v19" fill="none"/></g><g stroke="#A6F0E8" stroke-width="2" fill="#193B4C"><path d="M180 157h36v37h-36Z"/><path d="M185 184v-19h24v24h-12v-12h12m-24 0h12" fill="none"/></g><g fill="#36B7B0"><path d="M120 38V25"/><path d="m120 13 10 6v12l-10 6-10-6V19Z" fill="#A6F0E8"/></g><g fill="url(#shell)"><path d="M79 38H161L201 77V115L161 153H79L39 115V77Z"/></g>
+<rect x="60" y="66" width="120" height="68" rx="20" fill="#152B42"/>
+<g fill="none" stroke="#E5F8FF" stroke-width="4"><path d="M82 91h16m45-5 16 7"/><path d="M112 119q8-5 16 0"/></g>
+</g><g class="status" fill="#A6F0E8" stroke="#A6F0E8" stroke-width="3"><circle class="pulse" cx="192" cy="221" r="3"/><circle class="pulse" cx="203" cy="216" r="4"/><circle class="pulse" cx="216" cy="210" r="5"/></g></g></svg>

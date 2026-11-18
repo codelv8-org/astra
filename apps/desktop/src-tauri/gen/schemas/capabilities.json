@@ -1,0 +1,1 @@
+{"main-window":{"identifier":"main-window","description":"สิทธิ์เฉพาะหน้าต่าง local หลัก ไม่มี shell/fs หรือ remote origins","local":true,"windows":["main"],"permissions":["core:default"]}}

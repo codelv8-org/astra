@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="40 22 160 120" role="img" aria-labelledby="title desc">
+<title id="title">MIRA — icon</title>
+<desc id="desc">หุ่นยนต์ CrewBot ต้นฉบับ สถานะ icon พื้นหลังโปร่งใส</desc>
+<defs><linearGradient id="shell" x2="0.35" y2="1"><stop stop-color="#F6BCD8"/><stop offset="0.38" stop-color="#A597E8"/><stop offset="1" stop-color="#A597E8"/></linearGradient></defs>
+<style>@media(prefers-reduced-motion:reduce){.bot,.pulse,.status{animation:none!important}}</style>
+<g stroke="#24354B" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
+<g class="bot"><g fill="#A597E8"></g><g fill="url(#shell)"><path d="M43 98Q35 43 89 38Q120 22 151 38Q205 43 197 98Q199 153 120 155Q41 153 43 98Z"/></g>
+<rect x="60" y="66" width="120" height="68" rx="20" fill="#152B42"/>
+<g fill="none" stroke="#E5F8FF" stroke-width="6"><path d="M81 96q8-14 16 0m46 0 15-4"/><path d="M109 115q11 15 22 0Z"/></g>
+</g></g></svg>

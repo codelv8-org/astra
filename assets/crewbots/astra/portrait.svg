@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="25 12 190 160" role="img" aria-labelledby="title desc">
+<title id="title">ASTRA — portrait</title>
+<desc id="desc">หุ่นยนต์ CrewBot ต้นฉบับ สถานะ portrait พื้นหลังโปร่งใส</desc>
+<defs><linearGradient id="shell" x2="0.35" y2="1"><stop stop-color="#F2C75C"/><stop offset="0.38" stop-color="#4169E1"/><stop offset="1" stop-color="#4169E1"/></linearGradient></defs>
+<style>@media(prefers-reduced-motion:reduce){.bot,.pulse,.status{animation:none!important}}</style>
+<g stroke="#24354B" stroke-width="4" stroke-linejoin="round" stroke-linecap="round">
+<g class="bot"><g fill="#4169E1"><path d="M120 41V30"/><path fill="#F2C75C" d="m120 13 5 10 11 2-8 8 2 11-10-5-10 5 2-11-8-8 11-2Z"/></g><g fill="url(#shell)"><rect x="43" y="40" width="154" height="113" rx="49"/></g>
+<rect x="60" y="66" width="120" height="68" rx="20" fill="#152B42"/>
+<g fill="none" stroke="#E5F8FF" stroke-width="4"><path d="M82 95q7-7 14 0m48 0q7-7 14 0"/><path d="M110 117q10 7 20 0"/></g>
+</g></g></svg>

@@ -1,0 +1,7 @@
+/* สีอัตลักษณ์ ไม่แทน semantic status tokens ของแอป */
+.crewbot{display:inline-block;object-fit:contain;flex-shrink:0;pointer-events:none}.crewbot--icon{width:32px;height:32px}.crewbot--portrait{width:96px;height:88px}.crewbot--full{width:180px;height:210px;max-width:100%}
+.crewbot[data-character="astra"]{--crewbot-primary:#4169E1;--crewbot-accent:#F2C75C}
+.crewbot[data-character="forge"]{--crewbot-primary:#E98B3A;--crewbot-accent:#FFE0A3}
+.crewbot[data-character="mira"]{--crewbot-primary:#A597E8;--crewbot-accent:#F6BCD8}
+.crewbot[data-character="vector"]{--crewbot-primary:#36B7B0;--crewbot-accent:#A6F0E8}
+.crewbot[data-character="scout"]{--crewbot-primary:#879B4A;--crewbot-accent:#D5E89B}

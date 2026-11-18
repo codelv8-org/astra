@@ -1,0 +1,41 @@
+{
+  "name": "crewnest",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.25.0",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @crewnest/desktop dev",
+    "desktop": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/cargo.ps1 -Action desktop-dev",
+    "build": "pnpm --filter @crewnest/desktop build",
+    "desktop:build": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/cargo.ps1 -Action desktop-build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:rust": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/cargo.ps1 -Action core-test",
+    "test:ipc": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/cargo.ps1 -Action ipc-test",
+    "lint:rust": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/cargo.ps1 -Action core-clippy",
+    "test:e2e": "playwright test",
+    "format": "prettier --write apps/desktop/src packages/**/*.ts",
+    "lint": "eslint apps/desktop/src apps/web/src apps/api/src apps/api/test packages tests --max-warnings 0",
+    "api": "pnpm --filter @crewnest/api dev",
+    "web": "pnpm --filter @crewnest/web dev",
+    "build:web": "pnpm --filter @crewnest/web build",
+    "build:api": "pnpm --filter @crewnest/api build",
+    "test:remote": "pnpm --filter @crewnest/api test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "@types/node": "24.10.1",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@eslint/js": "10.0.1",
+    "eslint": "10.15.0",
+    "typescript-eslint": "8.73.0",
+    "globals": "16.5.0",
+    "prettier": "3.7.4",
+    "typescript": "5.9.3",
+    "vitest": "4.1.12"
+  }
+}

@@ -1,0 +1,22 @@
+[package]
+name = "crewnest-desktop"
+version = "0.1.0"
+edition = "2021"
+default-run = "crewnest-desktop"
+
+[build-dependencies]
+tauri-build = { version = "2.7.5", features = [] }
+
+[dependencies]
+tauri = { version = "2.12.6", features = [] }
+tauri-plugin-dialog = "2.8.4"
+crewnest-core = { path = "../../../packages/desktop-core" }
+serde_json = "1"
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+tauri = { version = "2.12.6", features = ["test"] }
+tempfile = "3"
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]

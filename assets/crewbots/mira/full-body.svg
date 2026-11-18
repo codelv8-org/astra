@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 280" role="img" aria-labelledby="title desc">
+<title id="title">MIRA — full-body</title>
+<desc id="desc">หุ่นยนต์ CrewBot ต้นฉบับ สถานะ full-body พื้นหลังโปร่งใส</desc>
+<defs><linearGradient id="shell" x2="0.35" y2="1"><stop stop-color="#F6BCD8"/><stop offset="0.38" stop-color="#A597E8"/><stop offset="1" stop-color="#A597E8"/></linearGradient></defs>
+<style>@media(prefers-reduced-motion:reduce){.bot,.pulse,.status{animation:none!important}}</style>
+<g stroke="#24354B" stroke-width="4" stroke-linejoin="round" stroke-linecap="round">
+<g class="bot"><g fill="url(#shell)"><path d="M91 158h58q22 31 15 64-44 21-88 0-7-33 15-64Z"/>
+      <path d="M79 173q-20-6-22 22v15h16v-17l11-5M161 173q20-6 22 22v15h-16v-17l-11-5"/>
+      <rect x="84" y="229" width="25" height="27" rx="10"/><rect x="131" y="229" width="25" height="27" rx="10"/>
+      <rect x="77" y="250" width="36" height="15" rx="7" fill="#F6BCD8"/><rect x="127" y="250" width="36" height="15" rx="7" fill="#F6BCD8"/>
+      <circle cx="65" cy="213" r="10" fill="#F6BCD8"/><circle cx="175" cy="213" r="10" fill="#F6BCD8"/>
+      </g><g fill="#F6BCD8" stroke="#F6BCD8" stroke-width="3"><path d="M103 182q17-15 34 0v23q-17 15-34 0Z"/><circle cx="118" cy="190" r="4" fill="#A597E8" stroke="none"/></g><g fill="#A597E8"><path d="m143 40 12-23 6 3-8 25Z" fill="#F6BCD8"/><path d="m155 17 7-7 0 10"/></g><g fill="url(#shell)"><path d="M43 98Q35 43 89 38Q120 22 151 38Q205 43 197 98Q199 153 120 155Q41 153 43 98Z"/></g>
+<rect x="60" y="66" width="120" height="68" rx="20" fill="#152B42"/>
+<g fill="none" stroke="#E5F8FF" stroke-width="4"><path d="M81 96q8-14 16 0m46 0 15-4"/><path d="M109 115q11 15 22 0Z"/></g>
+</g></g></svg>

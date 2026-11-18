@@ -1,0 +1,379 @@
+{
+  "schemaVersion": 1,
+  "product": "CrewNest",
+  "family": "CrewBots",
+  "generatedBy": "tools/build_crewbots.py",
+  "licenseDocument": "../../docs/ASSET_LICENSES.md",
+  "agents": [
+    {
+      "characterKey": "astra",
+      "name": "ASTRA",
+      "role": "CEO / Orchestrator",
+      "runtimeLabel": "OpenAI Codex",
+      "primary": "#4169E1",
+      "accent": "#F2C75C",
+      "assets": {
+        "full-body": {
+          "src": "astra/full-body.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "0 0 240 280",
+          "sha256": "2d6ec246f0852ca118ce3d2b3b827c19421bc937fda4a0b6f5a0314cfb7aacdc",
+          "fallback": null
+        },
+        "portrait": {
+          "src": "astra/portrait.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "25 12 190 160",
+          "sha256": "319e6e5ebf2f91c60b11d862b6244bb294026e4bd2310121e93a9cc566246a7b",
+          "fallback": null
+        },
+        "icon": {
+          "src": "astra/icon.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "40 22 160 120",
+          "sha256": "b2631c6e82deb965c146edee26d5e43a4215e6c363e0a1cc01abef58f75ddee1",
+          "fallback": null
+        },
+        "idle": {
+          "src": "astra/idle.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "0 0 240 280",
+          "sha256": "8f25f17b41daf17ae28a10ea9c4cf874fe8d4b74f1140ec1f5a4ba4f8b51fbdd",
+          "fallback": null
+        },
+        "working": {
+          "src": "astra/working.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "0 0 240 280",
+          "sha256": "fe55a9fc41e4f97b75a6e6f825c2f0281dcaf3760504bf441bf00917ab18899b",
+          "fallback": null
+        },
+        "thinking": {
+          "src": "astra/thinking.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "0 0 240 280",
+          "sha256": "73ef2c015fbcbdc47c927a7b1da771794e943f6468885644924970e2a80fa515",
+          "fallback": null
+        },
+        "success": {
+          "src": "astra/success.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "0 0 240 280",
+          "sha256": "b95469982dc0f14be100110e3a0755afc76d0a42181dac6149ffc921f408a730",
+          "fallback": null
+        },
+        "error": {
+          "src": "astra/error.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "0 0 240 280",
+          "sha256": "bcb99a54f085f4d00c6c99326f9214df0e43b48a5e67148c16e58d22348df321",
+          "fallback": null
+        }
+      }
+    },
+    {
+      "characterKey": "forge",
+      "name": "FORGE",
+      "role": "Software Engineering Lead",
+      "runtimeLabel": "Claude Code",
+      "primary": "#E98B3A",
+      "accent": "#FFE0A3",
+      "assets": {
+        "full-body": {
+          "src": "forge/full-body.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "0 0 240 280",
+          "sha256": "3fc828e33ad1231c356ab4f08ac252e9d6b74c0071f2e583cc9c1c5686cf81d6",
+          "fallback": null
+        },
+        "portrait": {
+          "src": "forge/portrait.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "25 12 190 160",
+          "sha256": "3046be59a73f146dfbaaef2da07c6e305eb35afa7ccd557a5def979eabd97e51",
+          "fallback": null
+        },
+        "icon": {
+          "src": "forge/icon.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "40 22 160 120",
+          "sha256": "f668ebdd3923a02afb33b6c7a4d1fae9c1cc6dfb2760a375e51dea7e2fa91236",
+          "fallback": null
+        },
+        "idle": {
+          "src": "forge/idle.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "0 0 240 280",
+          "sha256": "249743e026bd301696e202c7dc0ab37f1a91a0dd80058b60cdab2915e27b00cc",
+          "fallback": null
+        },
+        "working": {
+          "src": "forge/working.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "0 0 240 280",
+          "sha256": "de7e8a4f11c34112aef0ca4ca7a6440013249baef03f47b9a689e5f17520652b",
+          "fallback": null
+        },
+        "thinking": {
+          "src": "forge/thinking.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "0 0 240 280",
+          "sha256": "9ab7e584ed0686920ffebbd7d635323e191baf4009b040bd2654c0d58d1a35ff",
+          "fallback": null
+        },
+        "success": {
+          "src": "forge/success.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "0 0 240 280",
+          "sha256": "44a58c2b12ddb94009f6df3d708aa6556ba902f7f456901f8d4c35cfd1498e57",
+          "fallback": null
+        },
+        "error": {
+          "src": "forge/error.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "0 0 240 280",
+          "sha256": "7beb1f3bc1dd164500364df801e7a242dc0205fe76d17f42b9c8df23008059e1",
+          "fallback": null
+        }
+      }
+    },
+    {
+      "characterKey": "mira",
+      "name": "MIRA",
+      "role": "UI/UX Design Lead",
+      "runtimeLabel": "Antigravity",
+      "primary": "#A597E8",
+      "accent": "#F6BCD8",
+      "assets": {
+        "full-body": {
+          "src": "mira/full-body.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "0 0 240 280",
+          "sha256": "f76d69eabc376c18034a5be6c4687b4f9cdabfd0c2450a5121228dab876e9a3c",
+          "fallback": null
+        },
+        "portrait": {
+          "src": "mira/portrait.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "25 12 190 160",
+          "sha256": "e7ddc7b85e567eaa1bd436c0e6cb66c1ea68845f99ee9009a3c90ec21ee27c54",
+          "fallback": null
+        },
+        "icon": {
+          "src": "mira/icon.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "40 22 160 120",
+          "sha256": "9c379a921b139cc0a56b6a7e54d84ab712ab8ae9aaf81a84bc3a3330e0ba883f",
+          "fallback": null
+        },
+        "idle": {
+          "src": "mira/idle.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "0 0 240 280",
+          "sha256": "724f37a9f28d07c2134122d8425397c4282dc446dfe091696f81cba70cbfc858",
+          "fallback": null
+        },
+        "working": {
+          "src": "mira/working.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "0 0 240 280",
+          "sha256": "cb8b24665ca223064361db9fdf96095f2883dfebd77b0fb382dcd16b7a904384",
+          "fallback": null
+        },
+        "thinking": {
+          "src": "mira/thinking.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "0 0 240 280",
+          "sha256": "a8b6c68de12f54a7f03dd1cd46d1f0f9f76c6cdbbe61fb24225bdb27cc7d7e2b",
+          "fallback": null
+        },
+        "success": {
+          "src": "mira/success.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "0 0 240 280",
+          "sha256": "cc68682755831618dd23bdcca0d1be4680c4893d758d6c1dea7a887c57320067",
+          "fallback": null
+        },
+        "error": {
+          "src": "mira/error.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "0 0 240 280",
+          "sha256": "9f69f508d4db72bea0038abeb88fd6fab685a322a490b297c694739c37f35749",
+          "fallback": null
+        }
+      }
+    },
+    {
+      "characterKey": "vector",
+      "name": "VECTOR",
+      "role": "System Architect & Researcher",
+      "runtimeLabel": "OpenAI Codex",
+      "primary": "#36B7B0",
+      "accent": "#A6F0E8",
+      "assets": {
+        "full-body": {
+          "src": "vector/full-body.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "0 0 240 280",
+          "sha256": "b84ff3033d81481bf55e2794525d218a397061d861d92f0b591a4b2cd7df4cac",
+          "fallback": null
+        },
+        "portrait": {
+          "src": "vector/portrait.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "25 12 190 160",
+          "sha256": "71909846789ddaef9f983cc16dcb11399b5857485292d54f70d385ae20d564f8",
+          "fallback": null
+        },
+        "icon": {
+          "src": "vector/icon.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "40 22 160 120",
+          "sha256": "3d2dbdadf26f4c29068a23bc514360980885c2a60ca679c8700de6d211bed711",
+          "fallback": null
+        },
+        "idle": {
+          "src": "vector/idle.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "0 0 240 280",
+          "sha256": "c2ce7726b3c38af336d82e3f4b70a0c68b59c3874d92518dffb043e3e7acdf51",
+          "fallback": null
+        },
+        "working": {
+          "src": "vector/working.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "0 0 240 280",
+          "sha256": "37e07219de3667955d4568ccc8c9b18b41850f9d9e8cb16212008e78532c3371",
+          "fallback": null
+        },
+        "thinking": {
+          "src": "vector/thinking.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "0 0 240 280",
+          "sha256": "07b271f6d824e8a5a8a334009c6bb68706859988dd9980a86f251d8fb6c3d6ba",
+          "fallback": null
+        },
+        "success": {
+          "src": "vector/success.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "0 0 240 280",
+          "sha256": "2066e58a06d5bb62c264841a573a92baf3ab8e1a151764d9af55b8b9313c68d2",
+          "fallback": null
+        },
+        "error": {
+          "src": "vector/error.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "0 0 240 280",
+          "sha256": "d983ef6447b4c102e69f2027a62f1fad1d55dd5256790dff15570e93593148af",
+          "fallback": null
+        }
+      }
+    },
+    {
+      "characterKey": "scout",
+      "name": "SCOUT",
+      "role": "Reviewer, QA & UAT Lead",
+      "runtimeLabel": "OpenAI Codex",
+      "primary": "#879B4A",
+      "accent": "#D5E89B",
+      "assets": {
+        "full-body": {
+          "src": "scout/full-body.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "0 0 240 280",
+          "sha256": "bff5cb3c86b7b710a91a9156c15a05305ba0e3f3568106d19382a4e28f36b433",
+          "fallback": null
+        },
+        "portrait": {
+          "src": "scout/portrait.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "25 12 190 160",
+          "sha256": "b6b55b46a74f284d3e197cbbb2b2c8deae3daa2c2b5f3a1b8e465e8353368113",
+          "fallback": null
+        },
+        "icon": {
+          "src": "scout/icon.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "40 22 160 120",
+          "sha256": "2aa57b950de353cc3ee10764270510c25a588e3483c6ac6de3abef6935417cac",
+          "fallback": null
+        },
+        "idle": {
+          "src": "scout/idle.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "0 0 240 280",
+          "sha256": "f29d2e17dd8357ab8d0b5500164e3d5f579d89b48a18bb60f02acc59fa11df9d",
+          "fallback": null
+        },
+        "working": {
+          "src": "scout/working.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "0 0 240 280",
+          "sha256": "e574fa2a453d7e55f3315c581d1e677b0e9c396073d8590d40fc5f593bce4a6b",
+          "fallback": null
+        },
+        "thinking": {
+          "src": "scout/thinking.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "0 0 240 280",
+          "sha256": "0e29415e0d3e15e36e65c99bb5d36a165e0755ff18a13ea6de6c3bc57a6134f9",
+          "fallback": null
+        },
+        "success": {
+          "src": "scout/success.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "0 0 240 280",
+          "sha256": "031bb748202c1425510528caff6ab173c316ba6e3a0c88b9dfda03ec6890385d",
+          "fallback": null
+        },
+        "error": {
+          "src": "scout/error.svg",
+          "format": "svg",
+          "mimeType": "image/svg+xml",
+          "viewBox": "0 0 240 280",
+          "sha256": "f5ff140c740293f6d714d690ed8d13650470c150434c63823169ab9c5fb1b683",
+          "fallback": null
+        }
+      }
+    }
+  ]
+}
