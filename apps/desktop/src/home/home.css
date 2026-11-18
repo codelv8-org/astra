@@ -1,0 +1,529 @@
+/* Home 3D: ฉากเต็มจอ + การ์ดลอยซ้าย (โปรเจกต์) / ขวา (แชท CEO) ใช้ tokens เดิมของ Console */
+.home {
+  --card-bg: color-mix(in srgb, var(--panel) 86%, transparent);
+  --gap: 16px;
+  position: relative;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--bg);
+}
+.home-stage {
+  position: absolute;
+  inset: 0;
+}
+.home-stage canvas {
+  display: block;
+  cursor: grab;
+}
+.home-stage canvas:active {
+  cursor: grabbing;
+}
+.scene-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.bot-label {
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  padding: 4px 9px 5px;
+  border: 1px solid color-mix(in srgb, var(--agent-color) 55%, var(--line));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  color: var(--ink);
+  font-size: 11px;
+  line-height: 1.25;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px #0003;
+}
+.bot-label b {
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  color: var(--ink);
+}
+.bot-label small {
+  font-size: 10px;
+  max-width: 170px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bot-label::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #7f8ba3;
+  margin-bottom: 2px;
+}
+.bot-label[data-status="working"]::before,
+.home-legend [data-status="working"]::before {
+  background: #47d6a0;
+}
+.bot-label[data-status="waiting"]::before,
+.home-legend [data-status="waiting"]::before {
+  background: #f2b84b;
+}
+.bot-label[data-status="error"]::before,
+.home-legend [data-status="error"]::before {
+  background: #ff6b7f;
+}
+.stage-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  align-content: center;
+  padding: 90px 380px;
+}
+.stage-fallback button {
+  display: grid;
+  justify-items: center;
+  background: transparent;
+  border: 0;
+}
+.stage-fallback small {
+  flex-basis: 100%;
+  text-align: center;
+}
+
+.home-topbar {
+  position: absolute;
+  top: var(--gap);
+  left: var(--gap);
+  right: var(--gap);
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 10px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--card-bg);
+  backdrop-filter: blur(14px);
+  z-index: 2;
+}
+.home-topbar .brand {
+  font-size: 18px;
+}
+.home-topbar .brand-mark {
+  width: 32px;
+  height: 34px;
+  font-size: 19px;
+}
+.home-topbar .brand small {
+  display: block;
+  font-size: 8px;
+  letter-spacing: 1.4px;
+  color: var(--muted);
+}
+.home-topbar .actions {
+  display: flex;
+  gap: 8px;
+}
+.home-pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.pill {
+  padding: 5px 11px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.home-card {
+  position: absolute;
+  top: 92px;
+  bottom: var(--gap);
+  width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--card-bg);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 18px 50px #0004;
+  z-index: 2;
+  min-height: 0;
+}
+.home-projects {
+  left: var(--gap);
+  overflow-y: auto;
+}
+.home-chat {
+  right: var(--gap);
+  width: 380px;
+}
+.card-head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+.home-chat .card-head {
+  justify-content: flex-start;
+}
+.card-head button {
+  min-height: 36px;
+  padding: 4px 12px;
+}
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+.home-project-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.home-project-list button {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  padding: 12px;
+  background: color-mix(in srgb, var(--raised) 80%, transparent);
+}
+.home-project-list b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.meter {
+  display: block;
+  height: 5px;
+  border-radius: 9px;
+  background: var(--line);
+  overflow: hidden;
+}
+.meter span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #4169e1, #36b7b0);
+  border-radius: inherit;
+}
+.empty.compact {
+  padding: 24px 8px;
+  text-align: center;
+}
+
+.project-detail {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.project-detail > p {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.project-detail code {
+  font-size: 11px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.project-detail h3 {
+  margin-top: 6px;
+}
+button.link {
+  min-height: 0;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 12px;
+}
+button.link.back {
+  justify-self: start;
+}
+.mini-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin: 0;
+}
+.mini-metrics div {
+  padding: 8px 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  text-align: center;
+}
+.mini-metrics dt {
+  font-size: 10px;
+  color: var(--muted);
+}
+.mini-metrics dd {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+.flow-list,
+.run-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.flow-list > li {
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.steps {
+  list-style: none;
+  display: flex;
+  gap: 4px;
+  margin: 2px 0;
+  padding: 0;
+}
+.steps li {
+  flex: 1;
+  height: 6px;
+  border-radius: 4px;
+  background: var(--line);
+}
+.steps li[data-tone="ok"] {
+  background: #47d6a0;
+}
+.steps li[data-tone="run"] {
+  background: #4169e1;
+}
+.steps li[data-tone="wait"] {
+  background: #f2b84b;
+}
+.steps li[data-tone="bad"] {
+  background: #ff6b7f;
+}
+.run-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+.detail-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.chat-log {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 2px 4px 2px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.bubble {
+  max-width: 92%;
+  padding: 9px 12px;
+  border-radius: 14px;
+  font-size: 13px;
+}
+.bubble p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.bubble.ceo {
+  align-self: flex-start;
+  background: color-mix(in srgb, var(--raised) 85%, transparent);
+  border: 1px solid var(--line);
+  border-bottom-left-radius: 4px;
+}
+.bubble.owner {
+  align-self: flex-end;
+  background: #4169e1;
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.bubble-meta {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 10px;
+  letter-spacing: 0.4px;
+  color: var(--accent);
+}
+.bubble-time {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 4px;
+  font-size: 10px;
+  opacity: 0.7;
+}
+.chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.chips button {
+  min-height: 32px;
+  padding: 4px 11px;
+  border-radius: 99px;
+  font-size: 12px;
+}
+.chat-form {
+  display: grid;
+  gap: 8px;
+}
+.chat-form select {
+  flex: 1;
+  min-width: 0;
+  min-height: 36px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--raised);
+  color: var(--ink);
+}
+.chat-form textarea {
+  flex: 1;
+  min-width: 0;
+  resize: none;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--raised);
+  color: var(--ink);
+}
+.chat-form .row {
+  align-items: stretch;
+}
+.mock-toggle {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.home-legend {
+  position: absolute;
+  left: 50%;
+  bottom: var(--gap);
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: var(--card-bg);
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  z-index: 1;
+}
+.home-legend span::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: #7f8ba3;
+}
+.home-legend .hint::before {
+  display: none;
+}
+
+@media (max-width: 1180px) {
+  .home-card {
+    width: 300px;
+  }
+  .home-chat {
+    width: 330px;
+  }
+  .home-legend .hint {
+    display: none;
+  }
+}
+/* จอแคบ: ฉาก 3D อยู่บน การ์ดเรียงต่อด้านล่าง เลื่อนแนวตั้งได้ */
+@media (max-width: 900px) {
+  .home {
+    height: auto;
+    overflow: visible;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px 16px 16px;
+  }
+  .home-topbar,
+  .home-card,
+  .home-legend {
+    position: static;
+    transform: none;
+    width: auto;
+  }
+  .home-topbar {
+    order: 0;
+    flex-wrap: wrap;
+  }
+  .home-pills {
+    order: 3;
+    flex-basis: 100%;
+    justify-content: flex-start;
+  }
+  .home-stage {
+    position: relative;
+    order: 1;
+    height: 52vh;
+    min-height: 320px;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+  }
+  .home-legend {
+    order: 2;
+    justify-content: center;
+    flex-wrap: wrap;
+    white-space: normal;
+    border-radius: 14px;
+  }
+  .home-chat {
+    order: 3;
+    height: 560px;
+  }
+  .home-projects {
+    order: 4;
+    max-height: none;
+    overflow: visible;
+  }
+  .stage-fallback {
+    padding: 16px;
+  }
+  .bot-label {
+    padding: 2px 7px;
+  }
+  .bot-label small {
+    display: none;
+  }
+}

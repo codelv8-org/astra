@@ -91,7 +91,7 @@ test("writing IPC fixture requires content review and exact digest before apply"
       },
     };
   }, agents);
-  await page.goto("/");
+  await page.goto("/?view=console");
   await page.getByRole("button", { name: /FORGE WRITING FIXTURE/ }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByText("old source", { exact: true })).toBeVisible();

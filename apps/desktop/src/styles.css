@@ -274,7 +274,7 @@ small {
   color: var(--ink);
   background: var(--raised);
 }
-.sidebar nav a:first-child {
+.sidebar nav a:nth-child(2) {
   background: var(--raised);
   color: var(--ink);
 }
