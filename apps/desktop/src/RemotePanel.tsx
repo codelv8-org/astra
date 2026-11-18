@@ -66,6 +66,12 @@ export function RemotePanel({ projects }: { projects: Project[] }) {
           {error}
         </p>
       )}
+      {status?.connection === "pairing_required" && (
+        <p role="alert" className="error-text">
+          เซิร์ฟเวอร์ไม่ยอมรับการจับคู่เดิม ให้กด Forget pairing locally แล้วใช้
+          pairing code ใหม่เพื่อเชื่อมต่ออีกครั้ง
+        </p>
+      )}
       <p>
         แชร์เฉพาะ metadata ของโปรเจกต์ที่เลือก Logs/artifacts
         ต้องเปิดเพิ่มและอาจมีข้อมูลของงาน ตรวจข้อมูลก่อนแชร์ คำสั่งจาก Web
@@ -113,7 +119,10 @@ export function RemotePanel({ projects }: { projects: Project[] }) {
         <div className="queue-actions">
           <button
             disabled={
-              busy || ["connected", "connecting"].includes(status.connection)
+              busy ||
+              ["connected", "connecting", "pairing_required"].includes(
+                status.connection,
+              )
             }
             onClick={() => void act(() => bridge.remoteConnect())}
           >

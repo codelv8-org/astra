@@ -1,5 +1,29 @@
 # ผล Phase 3 — Central API / Web / secure remote control
 
+## ผลทดสอบซ้ำหลังแก้ revoke และตรวจเวลา WSL
+
+- Desktop Core หยุด reconnect เมื่อได้รับ close `4003 Revoked` หรือ HTTP 401 ระหว่าง WSS handshake และรายงาน `pairing_required` หน้าจอปิดปุ่มเชื่อมต่อและแจ้งให้ลืมการจับคู่ในเครื่องแล้วใช้โค้ดใหม่ การตัดการเชื่อมต่อทั่วไปยัง retry ตามเดิม
+- Windows System Event Log (`Microsoft-Windows-Kernel-General`, ID 1) บันทึกว่า `HOSMy.exe` ปรับเวลา Windows ย้อน 527.070 วินาที Windows Time รายงาน `Local CMOS Clock` และสถานะ unsynchronized ส่วน `systemd-timesyncd` ใน WSL ใช้ `ntp.ubuntu.com` เมื่อตั้งเวลา WSL ตาม Windows แล้วเปิดบริการกลับ WSL และ API container เร็วกว่า Windows อีก 527 วินาที
+- Docker E2E ผ่านบน Windows Core harness → HTTPS/WSS ผ่าน Nginx → Central API/PostgreSQL เมื่อพัก `systemd-timesyncd` ชั่วคราวและซิงก์เวลา WSL หนึ่งครั้ง ระบบใช้ TTL เดิมและตรวจความต่างของเวลาก่อนส่งคำสั่ง รอบ Mock จบ `completed` ที่ execution `9218ae9a-da67-420f-9dbd-0d04803f9afe` มี 6 events รอบ Codex จริงจบ `completed` ที่ execution `8446b411-3f92-4de0-b2e6-ecdf3b2a3a92` มี 3 events
+- ทั้งสองรอบยืนยันสถานะ `pairing_required` หลัง server revoke และหลังเริ่ม Core service ใหม่ด้วย credential เดิมที่ได้ HTTP 401 หลักฐานอยู่ใน result และ marker ภายใต้ `.local/phase3-compose/host-9aec6633-71b1-469c-a2d8-bf073f47cc08/` และ `.local/phase3-compose/host-bea9ffdf-5e07-492d-bb0f-181ef4be4e01/`
+- `pnpm test:remote` ผ่าน 1 ชุด รวม disconnect/reconnect ปกติและการปฏิเสธ credential หลัง revoke ส่วน Playwright ผ่าน 12 tests รวม fixture ที่ตรวจข้อความแจ้งเตือน ปุ่ม Connect ถูกปิด และฟอร์ม Pair device กลับมาหลัง Forget pairing locally
+- คืนบริการเวลา WSL และหยุด Compose ชุดทดสอบแล้ว การตั้งค่าเวลา Windows/HOSMy ยังเหมือนก่อนทดสอบ Windows release build ผ่าน ยังไม่ได้ทำ Native Desktop UAT ซ้ำหลังแก้
+
+## ผลตรวจงานค้างบน Docker และ Windows
+
+- Native Desktop UAT บน debug build และ SQLite แยก `.local/phase3-native-ui` ผ่าน Pair device ด้วยโค้ดใหม่, native approval และ CA picker สำหรับ Docker loopback ตรวจ device `c1c02ef1-289c-4979-8a5f-44786934c9ad` จากทั้ง Desktop และ API สถานะ API เปลี่ยน online → offline หลัง Disconnect remote → online หลัง Connect remote ด้วย ID เดิม → offline/revoked หลัง owner revoke ผ่าน API PostgreSQL เก็บ 2 connection records ทั้งคู่ปิดแล้ว การลองใช้ credential เดิมหลัง revoke ได้ HTTP 401 ที่ WSS upgrade
+- หลัง revoke Desktop แสดง `disconnected` แต่ background reconnect ยังลองซ้ำ และกด Connect ระหว่างนั้นอาจขึ้น `Remote connection already active; disconnect first` API ปฏิเสธ credential ทุกครั้ง หยุด Desktop และ Compose ชุดทดสอบหลังตรวจแล้ว การทดสอบข้ามเครื่องและ public TLS ยังอยู่นอกผลรอบนี้
+
+- หลังซิงก์เวลา Windows → WSL รอบใหม่ ตรวจเวลา API container ให้ต่างจาก Windows ไม่เกิน 2 วินาทีก่อนส่งแต่ละคำสั่ง Docker E2E ผ่าน HTTPS/WSS ผ่าน Nginx, submit และ start ได้ acknowledgement `accepted` ทั้งคู่ จากนั้น Mock execution `ca2d8907-6edc-4f1c-8532-acc19b196ccd` จบ `completed` ส่งกลับ 6 events รวม artifact และ revoke แล้ว device offline หลักฐานอยู่ `.local/phase3-compose/host-7e0b9333-65bc-4ca3-9ceb-a62748e31fc9/result.json`
+- ทดสอบซ้ำด้วย Codex ที่ authenticated แล้วบน stack เดียวกัน ใช้ prompt ตัวอย่างโดยไม่เรียก tools งาน `792842c9-a1f4-48aa-aac2-b368f05c2ce7` จบ `completed` ส่ง 3 events รวม artifact `CREWNEST_DOCKER_PHASE3_OK` และ revoke แล้ว device offline หลักฐานอยู่ `.local/phase3-compose/host-14df0f7d-03a4-46a4-bb68-c543e80c7847/result.json`
+- WSL กลับไปเร็วกว่า Windows ประมาณ 8 นาที 46 วินาทีหลังซิงก์ชั่วคราว จึงยังต้องตรวจกลไกซิงก์เวลาของ host ก่อนใช้งานต่อเนื่อง ผล E2E รอบผ่านใช้การตรวจและซิงก์เวลาเฉพาะช่วงทดสอบตามที่จำเป็น โดยใช้กติกา TTL ของแอปตามเดิม
+
+- Docker Compose standalone v5.6.0 ผ่าน checksum ตามรายการของ Docker ทั้ง API และ Web image build สำเร็จ PostgreSQL 18.4 healthy และ migration ผ่าน [คู่มือ Docker Compose standalone](https://docs.docker.com/compose/install/standalone/)
+- พบว่า `pnpm owner` ชนคำสั่งภายในของ pnpm แก้เป็น `pnpm run owner` แล้ว bootstrap บัญชีทดสอบใน container สำเร็จ
+- ตรวจ TLS โดยระบุ private CA ของชุดทดสอบ API health และหน้า Web ตอบ HTTP 200, API session ที่ยังไม่ login ตอบ 401 และ login ผ่าน Nginx ตอบ 200
+- Windows Core harness จับคู่ผ่าน HTTPS และเชื่อม WSS ผ่าน Nginx ได้ HTTP 101 เว็บอ่านสถานะ device, heartbeat และ metadata ของโปรเจกต์ตัวอย่างได้ การส่ง draft ถูกปฏิเสธด้วย `Expired or invalid command lifetime` เพราะเวลา API ใน WSL เร็วกว่า Windows ประมาณ 9 นาที ดังนั้นรอบ Docker ยืนยันได้ถึง pairing, snapshot และการปฏิเสธตามกติกาเวลา ส่วน execution มีผลผ่านจาก E2E เดิมด้านล่าง
+- เปิด Native Desktop ด้วยฐานข้อมูลทดสอบแยกสำเร็จ เครื่องมือ Computer Use รายงานว่าตรวจพบ input จากผู้ใช้แม้ตรวจภาพใหม่แล้ว จึงหยุดก่อนกด pairing การจับคู่ผ่านหน้าต่าง Desktop ข้ามเครื่องและ public TLS ยังรอตรวจบน staging ที่ระบุ
+
 วันที่ตรวจ 2026-11-18 Asia/Bangkok · source `D:\Projects\astraops` · ไม่มี HEAD commit และไม่ commit/push/deploy
 
 ## สิ่งที่ implement และใช้งานจริง

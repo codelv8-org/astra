@@ -427,6 +427,14 @@ test(
         200,
       );
       await wait(device, (d) => d.revoked && !d.online);
+      await writeFile(resolve(root, "control.txt"), "verify revoked");
+      await wait(
+        () =>
+          readFile(resolve(root, "revoked-verified.txt"), "utf8").catch(
+            () => "",
+          ),
+        (result) => result === "close and HTTP 401 terminal",
+      );
       assert.equal((await send("status")).status, 403);
       await page
         .getByRole("button", { name: "ออกจากระบบ", exact: true })

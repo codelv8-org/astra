@@ -9,7 +9,7 @@ use std::sync::{
     Arc,
 };
 use tokio_tungstenite::{
-    tungstenite::{client::IntoClientRequest, Message},
+    tungstenite::{client::IntoClientRequest, Error as WebSocketError, Message},
     Connector,
 };
 
@@ -419,15 +419,23 @@ impl Core {
 
 impl RemoteService {
     pub fn start(&self, core: Core, config: RemoteConfig, token: String) -> Result<()> {
+        let mut status = self.status.lock();
         if self.running.swap(true, Ordering::SeqCst) {
             return Err("Remote connection already active; disconnect first".into());
         }
         self.stop.store(false, Ordering::SeqCst);
+        *status = "connecting".into();
+        drop(status);
         let service = self.clone();
         tokio::spawn(async move {
             while !service.stop.load(Ordering::SeqCst) {
                 *service.status.lock() = "connecting".into();
                 let result = service.session(&core, &config, &token).await;
+                if matches!(result, Ok(SessionEnd::PairingRequired)) {
+                    *service.status.lock() = "pairing_required".into();
+                    service.running.store(false, Ordering::SeqCst);
+                    return;
+                }
                 if service.stop.load(Ordering::SeqCst) {
                     break;
                 }
@@ -447,7 +455,7 @@ impl RemoteService {
     pub fn disconnect(&self) {
         self.stop.store(true, Ordering::SeqCst);
     }
-    async fn session(&self, core: &Core, c: &RemoteConfig, token: &str) -> Result<()> {
+    async fn session(&self, core: &Core, c: &RemoteConfig, token: &str) -> Result<SessionEnd> {
         let mut url = server_url(&c.server)?;
         url.set_scheme("wss").map_err(|_| "Invalid WSS")?;
         url.set_path("/api/device/socket");
@@ -468,24 +476,48 @@ impl RemoteService {
             );
         }
         let connector = Connector::NativeTls(builder.build().map_err(|e| e.to_string())?);
-        let (mut ws, _) =
-            tokio_tungstenite::connect_async_tls_with_config(request, None, false, Some(connector))
-                .await
-                .map_err(|_| "Cannot connect to trusted WSS")?;
+        let (mut ws, _) = match tokio_tungstenite::connect_async_tls_with_config(
+            request,
+            None,
+            false,
+            Some(connector),
+        )
+        .await
+        {
+            Ok(connection) => connection,
+            Err(WebSocketError::Http(response)) if response.status().as_u16() == 401 => {
+                return Ok(SessionEnd::PairingRequired);
+            }
+            Err(_) => return Err("Cannot connect to trusted WSS".into()),
+        };
         *self.status.lock() = "connected".into();
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(2));
         let mut last_receive = std::time::Instant::now();
         let mut pending = std::collections::HashSet::<String>::new();
         loop {
             tokio::select! {
-                                     _=interval.tick()=>{if self.stop.load(Ordering::SeqCst){let _=ws.close(None).await;return Ok(());}
+                                     _=interval.tick()=>{if self.stop.load(Ordering::SeqCst){let _=ws.close(None).await;return Ok(SessionEnd::Disconnected);}
                         if last_receive.elapsed()>std::time::Duration::from_secs(15){return Err("Server heartbeat expired".into());}ws.send(Message::Text(json!({"type":"snapshot","data":core.remote_snapshot()?}).to_string().into())).await.map_err(|e|e.to_string())?;let events=core.remote_events()?;pending.extend(events.iter().filter_map(|e|e["id"].as_str().map(str::to_string)));ws.send(Message::Text(json!({"type":"events","events":events}).to_string().into())).await.map_err(|e|e.to_string())?;},
-                                     message=ws.next()=>{if self.stop.load(Ordering::SeqCst){let _=ws.close(None).await;return Ok(());}
-            let m=message.ok_or("WSS closed")?.map_err(|e|e.to_string())?;last_receive=std::time::Instant::now();if m.is_close(){return Err("WSS closed".into());}
+                                     message=ws.next()=>{if self.stop.load(Ordering::SeqCst){let _=ws.close(None).await;return Ok(SessionEnd::Disconnected);}
+            let m=message.ok_or("WSS closed")?.map_err(|e|e.to_string())?;
+            last_receive=std::time::Instant::now();
+            if let Message::Close(frame) = &m {
+                if frame.as_ref().is_some_and(|frame| {
+                    u16::from(frame.code) == 4003 && frame.reason.as_str() == "Revoked"
+                }) {
+                    return Ok(SessionEnd::PairingRequired);
+                }
+                return Err("WSS closed".into());
+            }
                         if !m.is_text(){continue;}let v:Value=serde_json::from_str(m.to_text().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;
                                       match v["type"].as_str(){Some("command")=>{let ack=match serde_json::from_value::<Envelope>(v["command"].clone()){Ok(command)=>{let id=command.command_id.clone();match core.handle_remote(c,command).await{Ok(ack)=>ack,Err(e)=>json!({"type":"ack","commandId":id,"state":"rejected","detail":core.remote_safe(&e).chars().take(500).collect::<String>()})}},Err(_)=>return Err("Invalid command schema".into())};ws.send(Message::Text(ack.to_string().into())).await.map_err(|e|e.to_string())?;},Some("events_ack")=>{if let Some(ids)=v["ids"].as_array(){for id in ids.iter().take(100).filter_map(Value::as_str){if pending.remove(id){core.store.connect()?.execute("INSERT OR IGNORE INTO remote_event_ack VALUES(?1)",[id]).map_err(|e|e.to_string())?;}}}},Some("ready")=>{},_=>return Err("Invalid server message".into())}
                                      }
                                     }
         }
     }
+}
+
+enum SessionEnd {
+    Disconnected,
+    PairingRequired,
 }

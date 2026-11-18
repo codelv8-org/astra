@@ -13,7 +13,11 @@ async fn remote_status(
 ) -> Result<RemoteStatus, String> {
     let config = core.remote_config()?;
     Ok(RemoteStatus {
-        connection: service.status.lock().clone(),
+        connection: if config.is_some() {
+            service.status.lock().clone()
+        } else {
+            "not_configured".into()
+        },
         device_id: config.as_ref().map(|c| c.device_id.clone()),
         server: config.map(|c| c.server),
         shared: core.remote_shared()?,
@@ -62,6 +66,9 @@ async fn remote_connect(
     core: State<'_, Core>,
     service: State<'_, RemoteService>,
 ) -> Result<(), String> {
+    if service.status.lock().as_str() == "pairing_required" {
+        return Err("Forget the old pairing locally and pair again".into());
+    }
     let config = core.remote_config()?.ok_or("Pair device first")?;
     let token = credential(&config)?
         .get_password()
