@@ -90,6 +90,24 @@ interface Bot {
   blink: number;
 }
 
+/** ตรวจว่า WebGL วาดด้วย CPU (ไม่มี GPU จริง) จากชื่อ renderer */
+function softwareRenderer() {
+  try {
+    const gl = document.createElement("canvas").getContext("webgl2");
+    if (!gl) return true;
+    const info = gl.getExtension("WEBGL_debug_renderer_info");
+    const name = String(
+      gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER),
+    );
+    gl.getExtension("WEBGL_lose_context")?.loseContext();
+    return /swiftshader|llvmpipe|softpipe|basic render|warp|software/i.test(
+      name,
+    );
+  } catch {
+    return true;
+  }
+}
+
 export class OfficeScene {
   private renderer: THREE.WebGLRenderer;
   private labels: CSS2DRenderer;
@@ -114,15 +132,29 @@ export class OfficeScene {
   private pointer = new THREE.Vector2();
   private disposed = false;
   private options: SceneOptions;
+  private lowPower: boolean;
+  private minFrame: number;
+  private sinceRender = 0;
 
   constructor(
     private host: HTMLElement,
     options: SceneOptions,
   ) {
     this.options = options;
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.shadowMap.enabled = true;
+    // GPU แบบ software (SwiftShader/WARP/llvmpipe เช่นเครื่อง CI หรือ VM) วาดช้ามาก
+    // จึงปิดเงา/antialias และจำกัดเฟรมเพื่อไม่ให้ main thread ค้าง
+    this.lowPower = softwareRenderer();
+    this.minFrame = this.lowPower ? 1 / 12 : 0;
+    host.dataset.quality = this.lowPower ? "low" : "high";
+    this.renderer = new THREE.WebGLRenderer({
+      antialias: !this.lowPower,
+      alpha: false,
+      powerPreference: this.lowPower ? "low-power" : "high-performance",
+    });
+    this.renderer.setPixelRatio(
+      this.lowPower ? 1 : Math.min(window.devicePixelRatio, 2),
+    );
+    this.renderer.shadowMap.enabled = !this.lowPower;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.domElement.setAttribute("aria-hidden", "true");
@@ -621,7 +653,10 @@ export class OfficeScene {
     if (this.disposed) return;
     this.frame = requestAnimationFrame(this.loop);
     if (document.hidden) return;
-    const dt = Math.min(this.clock.getDelta(), 0.05);
+    this.sinceRender += this.clock.getDelta();
+    if (this.sinceRender < this.minFrame) return;
+    const dt = Math.min(this.sinceRender, 0.1);
+    this.sinceRender = 0;
     const time = this.clock.elapsedTime;
     const still = this.options.reducedMotion;
 
