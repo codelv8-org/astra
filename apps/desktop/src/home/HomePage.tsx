@@ -324,30 +324,6 @@ export function HomePage({
 
   return (
     <div className="home">
-      <div
-        className="home-stage"
-        ref={stage}
-        role="img"
-        aria-label={`ออฟฟิศ 3D ของ CrewBots: ${agentStates.map((agent) => `${agent.name} ${agent.activity}`).join(", ")}`}
-      >
-        {!webgl && (
-          <div className="stage-fallback">
-            {data.agents.map((agent) => (
-              <button key={agent.id} onClick={() => onSelectAgent(agent)}>
-                <img
-                  src={`/crewbots/${agent.characterKey}/idle.svg`}
-                  alt=""
-                  width="90"
-                  height="105"
-                />
-                {agent.name}
-              </button>
-            ))}
-            <small>อุปกรณ์นี้ไม่รองรับ WebGL2 จึงแสดงแบบ 2D</small>
-          </div>
-        )}
-      </div>
-
       <header className="home-topbar">
         <a
           className="brand"
@@ -380,6 +356,30 @@ export function HomePage({
           </button>
         </div>
       </header>
+
+      <div
+        className="home-stage"
+        ref={stage}
+        role="img"
+        aria-label={`ออฟฟิศ 3D ของ CrewBots: ${agentStates.map((agent) => `${agent.name} ${agent.activity}`).join(", ")}`}
+      >
+        {!webgl && (
+          <div className="stage-fallback">
+            {data.agents.map((agent) => (
+              <button key={agent.id} onClick={() => onSelectAgent(agent)}>
+                <img
+                  src={`/crewbots/${agent.characterKey}/idle.svg`}
+                  alt=""
+                  width="90"
+                  height="105"
+                />
+                {agent.name}
+              </button>
+            ))}
+            <small>อุปกรณ์นี้ไม่รองรับ WebGL2 จึงแสดงแบบ 2D</small>
+          </div>
+        )}
+      </div>
 
       <aside className="home-card home-projects" aria-label="รายการโปรเจกต์">
         {project ? (

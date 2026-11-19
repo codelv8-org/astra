@@ -756,8 +756,6 @@ export class OfficeScene {
     const { clientWidth: width, clientHeight: height } = this.host;
     if (!width || !height) return;
     this.renderer.setSize(width, height, false);
-    this.renderer.domElement.style.width = "100%";
-    this.renderer.domElement.style.height = "100%";
     this.labels.setSize(width, height);
     this.camera.aspect = width / height;
     // จอแคบ: ถอยกล้องให้เห็นครบทั้งทีม

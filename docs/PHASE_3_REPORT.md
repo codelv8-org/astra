@@ -1,5 +1,21 @@
 # ผล Phase 3 — Central API / Web / secure remote control
 
+## 2026-11-19 — แก้ขนาดฉาก Home และทดสอบ Windows release
+
+- วางแถบนำทางก่อนฉาก 3D ในลำดับหน้า ให้ CSS จำกัด canvas ตามกรอบ `.home-stage` และให้ WebGL ปรับเฉพาะขนาดบัฟเฟอร์วาดภาพ
+- `pnpm desktop:build` ผ่าน ไฟล์ `target/release/crewnest-desktop.exe` SHA-256 `EFF6417C57A8E6ABA006834E55100E76B482C4D13B16BD2CBE65574A60ECDB66`
+- ทดสอบกับหน้าต่าง Tauri/WebView2 จริงที่ขนาดเริ่มต้น เปิดจากไฟล์ release โดยตรง เห็นปุ่ม Console ทันทีโดยไม่เลื่อนหน้า คลิกแล้วเข้า Command Center ได้ และคลิก Home 3D กลับมาเห็นฉาก 3D อีกครั้ง
+- TypeScript, ESLint, Vitest 11 tests และ `git diff --check` ผ่าน รอบนี้ทดสอบบน Desktop โดยตรง ยังไม่เริ่ม Phase 4
+
+## Native UAT หลังแก้ revoke
+
+- ทดสอบ `target/release/crewnest-desktop.exe` SHA-256 `173649346BBEF8AD4FB604D74CA183447EE30B88EAE69B18FBA9EBC81BF2F583` กับ Docker HTTPS/WSS บน loopback ใช้ฟอร์มใน WebView2 จริง กล่องยืนยันและ CA picker ของ Windows จริง
+- จับคู่ด้วยโค้ดใหม่ได้ device `537ad464-e88a-452b-94d0-949b71763494` Desktop ขึ้น `connected` และ API ขึ้น online จากนั้น Disconnect และ Connect ทำให้ API เปลี่ยน offline → online ด้วย ID เดิม
+- Owner revoke แล้ว Desktop ขึ้น `pairing_required` ปิด Connect และแจ้งให้กด Forget pairing locally แล้วใช้โค้ดใหม่ PostgreSQL มี 2 connection records และปิดทั้งคู่ ภายในช่วงเฝ้าดู 26 วินาที Nginx บันทึกเพียง WSS เดิมที่สิ้นสุด ไม่มี handshake ซ้ำ
+- Forget pairing locally แล้วหน้า Desktop กลับเป็น `not_configured` จับคู่ด้วยโค้ดชุดที่สองได้ device `966b9649-1573-4d48-9b96-62d98f6a90a8` ซึ่งขึ้น connected/online ขณะ device เดิมยัง revoked/offline
+- Release ใช้ SQLite ปกติเพราะ `CREWNEST_DATA_DIR` รองรับเฉพาะ debug ชุดทดสอบไม่มีการแชร์โปรเจกต์หรือส่งคำสั่ง หลังตรวจได้ revoke อุปกรณ์ทดสอบทั้งสองและลืมการจับคู่ใน Desktop แล้ว ตรวจ SQLite read-only พบ integrity `ok` ข้อมูล 2 โปรเจกต์และ 12 executions ตรงกับ baseline และการตั้งค่า remote กลับเป็นว่าง รายการ audit ของการทดสอบยังอยู่ ปิด Desktop และ Compose ชุดทดสอบแล้ว
+- หน้า Home ของ binary ที่ทดสอบแสดง canvas สูงจนปุ่ม Console อยู่นอก viewport จึงเปิด `?view=console#remote` ใน WebView2 ของ release เดิมเพื่อทดสอบ remote controls
+
 ## ผลทดสอบซ้ำหลังแก้ revoke และตรวจเวลา WSL
 
 - Desktop Core หยุด reconnect เมื่อได้รับ close `4003 Revoked` หรือ HTTP 401 ระหว่าง WSS handshake และรายงาน `pairing_required` หน้าจอปิดปุ่มเชื่อมต่อและแจ้งให้ลืมการจับคู่ในเครื่องแล้วใช้โค้ดใหม่ การตัดการเชื่อมต่อทั่วไปยัง retry ตามเดิม
