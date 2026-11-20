@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type { Agent, Snapshot } from "../../../../packages/shared/src";
 import { bridge } from "../bridge";
 import "./home.css";
+import { AstraMark, ThemeGlyph } from "../../../../packages/ui/src/AstraMark";
 import type { OfficeScene, SceneAgent } from "./OfficeScene";
 import {
   acceptedReport,
@@ -324,32 +325,39 @@ export function HomePage({
 
   return (
     <div className="home">
-      <header className="home-topbar">
+      <header className="home-topbar glass">
         <a
           className="brand"
           href="#home"
           onClick={(event) => event.preventDefault()}
         >
-          <span className="brand-mark" aria-hidden="true">
-            C
-          </span>
-          <span>
-            CrewNest<small>AI AGENT COMMAND CENTER</small>
-          </span>
+          <AstraMark />
+          <span>Astra</span>
         </a>
         <div className="home-pills" aria-label="สถานะสรุป">
-          <span className="pill">
-            <span className="status-dot" />
+          <span className="chip" data-tone={native ? "ok" : "wait"}>
+            <span className="dot" />
             {native
               ? "Desktop Core connected"
               : "Browser preview · Desktop required"}
           </span>
-          <span className="pill">กำลังทำ {running}</span>
-          <span className="pill">รออนุมัติ {approvals}</span>
+          <span className="chip" data-tone={running ? "run" : "idle"}>
+            <span className="dot" />
+            กำลังทำ {running}
+          </span>
+          <span className="chip" data-tone={approvals ? "wait" : "idle"}>
+            <span className="dot" />
+            รออนุมัติ {approvals}
+          </span>
         </div>
         <div className="actions">
-          <button onClick={onToggleTheme} aria-label="สลับ light/dark theme">
-            {theme === "dark" ? "Light" : "Dark"} theme
+          <button
+            className="icon quiet"
+            onClick={onToggleTheme}
+            aria-label="สลับ light/dark theme"
+            title={theme === "dark" ? "ธีมสว่าง" : "ธีมมืด"}
+          >
+            <ThemeGlyph theme={theme} />
           </button>
           <button className="primary" onClick={() => onOpenConsole()}>
             Console
@@ -381,7 +389,7 @@ export function HomePage({
         )}
       </div>
 
-      <aside className="home-card home-projects" aria-label="รายการโปรเจกต์">
+      <aside className="home-card home-projects glass" aria-label="รายการโปรเจกต์">
         {project ? (
           <ProjectDetail
             project={project}
@@ -403,6 +411,7 @@ export function HomePage({
                 </p>
               </div>
               <button
+                className="icon"
                 disabled={!native}
                 onClick={onAddProject}
                 aria-label="เพิ่มโปรเจกต์"
@@ -427,8 +436,8 @@ export function HomePage({
                       >
                         <span className="row">
                           <b>{item.name}</b>
-                          <span className="tag">
-                            {item.isGit ? "GIT" : "DIR"}
+                          <span className="chip">
+                            {item.isGit ? "Git" : "Folder"}
                           </span>
                         </span>
                         <small>
@@ -468,7 +477,7 @@ export function HomePage({
                 <p>
                   {native
                     ? "ยังไม่มีโปรเจกต์ กด ＋ เพื่อเลือก directory"
-                    : "เปิด CrewNest Desktop เพื่อดูโปรเจกต์"}
+                    : "เปิด Astra Desktop เพื่อดูโปรเจกต์"}
                 </p>
               </div>
             )}
@@ -476,7 +485,7 @@ export function HomePage({
         )}
       </aside>
 
-      <aside className="home-card home-chat" aria-label="แชทกับ CEO">
+      <aside className="home-card home-chat glass" aria-label="แชทกับ CEO">
         <div className="card-head">
           <img
             src="/crewbots/astra/portrait.svg"
@@ -520,7 +529,7 @@ export function HomePage({
               <p>
                 {native
                   ? "กำลังเชื่อมต่อ Core…"
-                  : "แชทกับ CEO ใช้ได้ใน CrewNest Desktop เท่านั้น"}
+                  : "แชทกับ CEO ใช้ได้ใน Astra Desktop เท่านั้น"}
               </p>
             </li>
           )}
@@ -599,7 +608,7 @@ export function HomePage({
         </form>
       </aside>
 
-      <div className="home-legend" aria-hidden="true">
+      <div className="home-legend glass" aria-hidden="true">
         {[
           ["working", "กำลังทำ"],
           ["waiting", "รออนุมัติ/ตรวจ"],

@@ -20,6 +20,8 @@ import { Modal } from "../../../packages/ui/src/Modal";
 import { bridge, desktopAvailable } from "./bridge";
 import { QueueBoard } from "./QueueBoard";
 import { HomePage } from "./home/HomePage";
+import { sceneAgents } from "./home/ceo";
+import { AstraMark, ThemeGlyph } from "../../../packages/ui/src/AstraMark";
 
 const empty: Snapshot = {
   agents: agents as Agent[],
@@ -34,6 +36,40 @@ const runtimeLabels: Record<string, string> = {
   codex: "CODEX",
   claude: "CLAUDE CODE",
   antigravity: "ANTIGRAVITY",
+};
+
+const adapterNames: Record<string, string> = {
+  codex: "OpenAI Codex",
+  claude: "Claude Code",
+  antigravity: "Antigravity",
+  mock: "Mock Adapter",
+};
+const agentColors: Record<string, string> = {
+  astra: "#4169E1",
+  forge: "#E98B3A",
+  mira: "#A597E8",
+  vector: "#36B7B0",
+  scout: "#879B4A",
+};
+/** สถานะ → โทนสีของชิป */
+const toneOf: Record<string, string> = {
+  working: "run",
+  running: "run",
+  queued: "run",
+  waiting: "wait",
+  error: "bad",
+  failed: "bad",
+  canceled: "idle",
+  completed: "ok",
+  idle: "idle",
+  offline: "idle",
+};
+/** สถานะ → ความสว่างของจุดแสงประจำ agent บนพื้นหลัง */
+const glowLevel: Record<string, number> = {
+  working: 0.56,
+  waiting: 0.4,
+  error: 0.32,
+  offline: 0.05,
 };
 
 export function App() {
@@ -218,16 +254,36 @@ export function App() {
               minute: "2-digit",
             }),
             color:
-              data.agents.find((agent) => agent.id === run.agentId)
-                ?.characterKey === "forge"
-                ? "#E98B3A"
-                : "#4169E1",
+              agentColors[
+                data.agents.find((agent) => agent.id === run.agentId)
+                  ?.characterKey ?? "astra"
+              ] ?? agentColors.astra,
           })),
       })),
     [data.executions, data.agents],
   );
   const running = data.executions.filter((run) => run.status === "running");
+  const failed = data.executions.filter((run) => run.status === "failed");
+  const approvals = (data.tasks ?? []).filter(
+    (task) => task.gate && ["ready", "needs_review"].includes(task.status),
+  ).length;
   const run = data.executions.find((item) => item.id === selectedRun);
+  const crew = useMemo(() => sceneAgents(data), [data]);
+  // ท้องฟ้าของทีม: จุดแสงของ agent สว่างขึ้นตามสถานะจริงจาก Core
+  useEffect(() => {
+    const root = document.documentElement.style;
+    for (const agent of crew)
+      root.setProperty(
+        `--glow-${agent.characterKey}`,
+        String(glowLevel[agent.status] ?? "var(--glow-floor)"),
+      );
+  }, [crew]);
+  const pulse: [string, number, string][] = [
+    ["กำลังรัน", running.length, running.length ? "run" : "idle"],
+    ["รออนุมัติ", approvals, approvals ? "wait" : "idle"],
+    ["ล้มเหลว", failed.length, failed.length ? "bad" : "idle"],
+    ["โปรเจกต์", data.projects.length, "idle"],
+  ];
   return (
     <>
       {view === "home" ? (
@@ -248,18 +304,13 @@ export function App() {
           onRefresh={refresh}
         />
       ) : (
-        <div className="app-shell">
-          <aside className="sidebar">
-            <a className="brand" href="#dashboard">
-              <span className="brand-mark" aria-hidden="true">
-                C
-              </span>
-              <span>
-                CrewNest<small>AI AGENT COMMAND CENTER</small>
-              </span>
+        <div className="console">
+          <header className="dock glass">
+            <a className="brand" href="#overview">
+              <AstraMark />
+              <span>Astra</span>
             </a>
-            <div className="nav-label">WORKSPACE</div>
-            <nav aria-label="เมนูหลัก">
+            <nav className="dock-nav" aria-label="เมนูหลัก">
               <a
                 href="?"
                 onClick={(event) => {
@@ -267,67 +318,32 @@ export function App() {
                   openView("home");
                 }}
               >
-                ← Home 3D
+                Home
               </a>
-              <a href="#dashboard">
-                Overview <span>01</span>
-              </a>
-              <a href="#agents">
-                CrewBots <span>05</span>
-              </a>
-              <a href="#projects">
-                Projects <span>{data.projects.length}</span>
+              <a href="#overview">Overview</a>
+              <a href="#tasks">
+                Queue <span>{(data.tasks ?? []).length}</span>
               </a>
               <a href="#monitor">
-                Executions <span>{data.executions.length}</span>
+                Runs <span>{data.executions.length}</span>
               </a>
-              <a href="#runtimes">Runtime health</a>
+              {native && <a href="#remote">Remote</a>}
             </nav>
-            <div className="local-note">
-              <span className="status-dot" /> Local-first
-              <small>
-                Remote control: {data.remoteStatus}
-                <br />
-                Phase 3 · secure remote control
-              </small>
-            </div>
-          </aside>
-          <main id="dashboard">
-            <header className="topbar">
-              <div>
-                <span className="eyebrow">PERSONAL AI WORKSPACE</span>
-                <p>
-                  <span className="status-dot" />
-                  {native
-                    ? "Desktop Core connected"
-                    : "Browser preview · Desktop required"}
-                </p>
-              </div>
-              <div className="actions">
-                <button
-                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                  aria-label="สลับ light/dark theme"
-                >
-                  {theme === "dark" ? "Light" : "Dark"} theme
-                </button>
-                <span className="version">v0.1.0 / LOCAL</span>
-              </div>
-            </header>
-            {!native && (
-              <div className="banner">
-                นี่คือ frontend preview ไม่มี local execution
-                หรือข้อมูลจำลองว่าเป็นผลจริง เปิดแอปด้วย{" "}
-                <code>pnpm desktop</code>
-              </div>
-            )}
-            <div className="page-heading">
-              <div>
-                <p className="eyebrow">COMMAND CENTER</p>
-                <h1>ทีมพร้อมรับภารกิจของคุณ</h1>
-                <p className="muted">
-                  จัดการโปรเจกต์ ตรวจ runtime และติดตามทุก execution ในเครื่อง
-                </p>
-              </div>
+            <span className="chip core-chip" data-tone={native ? "ok" : "wait"}>
+              <span className="dot" />
+              {native
+                ? "Desktop Core connected"
+                : "Browser preview · Desktop required"}
+            </span>
+            <div className="dock-actions">
+              <button
+                className="icon quiet"
+                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                aria-label="สลับ light/dark theme"
+                title={theme === "dark" ? "ธีมสว่าง" : "ธีมมืด"}
+              >
+                <ThemeGlyph theme={theme} />
+              </button>
               <button
                 className="primary"
                 disabled={!native}
@@ -336,276 +352,309 @@ export function App() {
                   setModal("run");
                 }}
               >
-                ＋ New execution
+                <span className="plus" aria-hidden="true">
+                  ＋
+                </span>
+                New execution
               </button>
             </div>
+          </header>
+          <main className="bento" id="overview">
+            {!native && (
+              <p className="preview-note span-12">
+                Frontend preview: ไม่มี local execution และไม่แสดงข้อมูลจำลองเป็นผลจริง
+                เปิดแอปด้วย <code>pnpm desktop</code>
+              </p>
+            )}
             {error && !modal && (
-              <div role="alert" className="error">
+              <div role="alert" className="error span-12">
                 {error}
                 <button aria-label="ปิดข้อผิดพลาด" onClick={() => setError("")}>
                   ×
                 </button>
               </div>
             )}
-            <p role="status" className="notice">
+            <p role="status" className="notice span-12">
               {notice}
             </p>
-            <section className="metrics" aria-label="สถานะสรุป">
-              {[
-                ["Projects", data.projects.length],
-                ["CrewBots", data.agents.length],
-                ["Running", running.length],
-                [
-                  "Failed",
-                  data.executions.filter((run) => run.status === "failed")
-                    .length,
-                ],
-              ].map(([label, value]) => (
-                <div className="metric" key={label}>
-                  <span>{label}</span>
-                  <strong>{value}</strong>
-                  <small>
-                    {label === "CrewBots"
-                      ? "Configurable agent records"
-                      : "Local persistent state"}
-                  </small>
-                </div>
-              ))}
-            </section>
-            <section id="agents">
-              <div className="section-heading">
-                <div>
-                  <h2>Your CrewBots</h2>
-                  <p className="muted">ห้าบทบาท หนึ่งเป้าหมายร่วมกัน</p>
-                </div>
-                <span className="tag">HUMAN APPROVAL REQUIRED</span>
+
+            <section className="tile pulse span-4" aria-label="สถานะสรุป">
+              <div className="tile-head">
+                <h2>Pulse</h2>
+                <span className="chip">
+                  {(data.schedulerPaused ?? true)
+                    ? "Scheduling paused"
+                    : "Scheduling active"}
+                </span>
               </div>
-              <div className="agent-grid">
-                {data.agents.map((agent) => (
-                  <article
-                    className="agent-card"
-                    key={agent.id}
-                    style={
-                      {
-                        "--agent-color": (
-                          {
-                            astra: "#4169E1",
-                            forge: "#E98B3A",
-                            mira: "#A597E8",
-                            vector: "#36B7B0",
-                            scout: "#879B4A",
-                          } as Record<string, string>
-                        )[agent.characterKey],
-                      } as React.CSSProperties
-                    }
-                  >
-                    <div className="agent-card-top">
-                      <span className="agent-number">
-                        {agent.id.toUpperCase()}
-                      </span>
-                      <span className="state">
-                        <span className="status-dot" />
-                        {agent.status}
-                      </span>
-                    </div>
-                    <div className="avatar-stage">
-                      <img
-                        src={`/crewbots/${agent.characterKey}/${agent.status === "working" ? "working" : "idle"}.svg`}
-                        width="180"
-                        height="210"
-                        alt=""
-                      />
-                    </div>
-                    <h3>{agent.name}</h3>
-                    <p className="role">{agent.role}</p>
-                    <p className="provider">
-                      {
-                        {
-                          codex: "OpenAI Codex",
-                          claude: "Claude Code",
-                          antigravity: "Antigravity",
-                          mock: "Mock Adapter",
-                        }[agent.runtimeAdapter]
-                      }
-                    </p>
-                    <button
-                      onClick={() => {
-                        setError("");
-                        setModal(agent);
-                      }}
-                    >
-                      รายละเอียด <span aria-hidden="true">↗</span>
-                    </button>
-                  </article>
+              <dl className="pulse-grid">
+                {pulse.map(([label, value, tone]) => (
+                  <div key={label} data-tone={tone}>
+                    <dt>
+                      <span className="dot" />
+                      {label}
+                    </dt>
+                    <dd>{value}</dd>
+                  </div>
                 ))}
+              </dl>
+            </section>
+
+            <section className="tile crew span-8" id="agents">
+              <div className="tile-head">
+                <div>
+                  <h2>Crew</h2>
+                  <p>ห้าบทบาท ทุกงานรอคุณอนุมัติ</p>
+                </div>
+              </div>
+              <div className="crew-grid">
+                {data.agents.map((agent) => {
+                  const live = crew.find((item) => item.id === agent.id);
+                  const tone = toneOf[live?.status ?? "idle"];
+                  return (
+                    <article
+                      className="crew-card well"
+                      key={agent.id}
+                      style={
+                        {
+                          "--agent": `var(--c-${agent.characterKey})`,
+                        } as React.CSSProperties
+                      }
+                    >
+                      <img
+                        src={`/crewbots/${agent.characterKey}/portrait.svg`}
+                        width="44"
+                        height="41"
+                        alt=""
+                      />
+                      <div className="crew-text">
+                        <h3>{agent.name}</h3>
+                        <p className="crew-role">{agent.role}</p>
+                      </div>
+                      <p className="crew-live" data-tone={tone}>
+                        <span className="dot" />
+                        <span>
+                          {!live || live.activity === agent.role
+                            ? live?.status === "offline"
+                              ? "ออฟไลน์"
+                              : "ว่าง พร้อมรับงาน"
+                            : live.activity}
+                        </span>
+                      </p>
+                      <div className="crew-foot">
+                        <span className="chip">
+                          {adapterNames[agent.runtimeAdapter] ??
+                            agent.runtimeAdapter}
+                        </span>
+                        <button
+                          className="link"
+                          onClick={() => {
+                            setError("");
+                            setModal(agent);
+                          }}
+                        >
+                          รายละเอียด
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
             </section>
-            <div className="workspace-grid">
-              <div>
-                <section className="panel" id="projects">
-                  <div className="section-heading">
-                    <div>
-                      <h2>Projects</h2>
-                      <p className="muted">Approved local workspaces</p>
-                    </div>
-                    <button
-                      disabled={!native}
-                      onClick={() => {
-                        setError("");
-                        setModal("project");
-                      }}
-                    >
-                      ＋ Add project
-                    </button>
+
+            <div className="span-8 queue-slot">
+              <QueueBoard
+                data={data}
+                onRefresh={refresh}
+                onExecution={setSelectedRun}
+              />
+            </div>
+
+            <aside className="tile activity span-4">
+              <div className="tile-head">
+                <div>
+                  <h2>Activity</h2>
+                  <p>100 runs ล่าสุดในเครื่อง</p>
+                </div>
+              </div>
+              <ActivityTabs groups={groups} />
+            </aside>
+
+            <section
+              className={`tile ${native ? "span-4" : "span-6"}`}
+              id="projects"
+            >
+              <div className="tile-head">
+                <div>
+                  <h2>Projects</h2>
+                  <p>{data.projects.length} workspaces ที่อนุมัติแล้ว</p>
+                </div>
+                <button
+                  disabled={!native}
+                  onClick={() => {
+                    setError("");
+                    setModal("project");
+                  }}
+                >
+                  <span className="plus" aria-hidden="true">
+                    ＋
+                  </span>
+                  Add project
+                </button>
+              </div>
+              {data.projects.length ? (
+                <ul className="rows">
+                  {data.projects.map((project) => (
+                    <li key={project.id} className="row-item">
+                      <div className="row-main">
+                        <h3>{project.name}</h3>
+                        <p className="muted clip">
+                          {project.goal || "ยังไม่ได้กำหนด objective"}
+                        </p>
+                        <code className="path">{project.path}</code>
+                      </div>
+                      <span className="chip">
+                        {project.isGit ? "Git" : "Folder"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="empty">
+                  <img
+                    src="/crewbots/astra/portrait.svg"
+                    alt=""
+                    width="56"
+                    height="52"
+                  />
+                  <div>
+                    <h3>เริ่มจากโปรเจกต์แรก</h3>
+                    <p className="hint">
+                      เลือก directory ผ่าน native dialog เพื่ออนุมัติ workspace
+                    </p>
                   </div>
-                  {data.projects.length ? (
-                    <div className="project-list">
-                      {data.projects.map((project) => (
-                        <article key={project.id}>
-                          <div>
-                            <h3>{project.name}</h3>
-                            <p>{project.goal || "ยังไม่ได้กำหนด objective"}</p>
-                            <code>{project.path}</code>
-                          </div>
-                          <span className="tag">
-                            {project.isGit
-                              ? "GIT REPOSITORY"
-                              : "LOCAL DIRECTORY"}
-                          </span>
-                        </article>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="empty">
-                      <img
-                        src="/crewbots/astra/portrait.svg"
-                        alt=""
-                        width="80"
-                        height="74"
-                      />
-                      <h3>เริ่มจากโปรเจกต์แรก</h3>
-                      <p>
-                        เลือก directory ผ่าน native dialog เพื่ออนุมัติ
-                        workspace
-                      </p>
-                    </div>
-                  )}
-                </section>
-                <section className="panel" id="runtimes">
-                  <div className="section-heading">
-                    <div>
-                      <h2>Runtime health</h2>
-                      <p className="muted">
-                        ตรวจ installation และ authentication โดยไม่อ่าน
-                        credentials
-                      </p>
-                    </div>
-                    <button
-                      disabled={!native || checking}
-                      onClick={() => void checkRuntimes()}
-                    >
-                      {checking ? "กำลังตรวจ…" : "Check runtimes"}
-                    </button>
-                  </div>
-                  {!diagnostics.length && (
-                    <p className="muted">ยังไม่ได้ตรวจ CLI ใน session นี้</p>
-                  )}
+                </div>
+              )}
+            </section>
+
+            <section
+              className={`tile ${native ? "span-4" : "span-6"}`}
+              id="runtimes"
+            >
+              <div className="tile-head">
+                <div>
+                  <h2>Runtime health</h2>
+                  <p>ตรวจการติดตั้งและ auth โดยไม่อ่าน credentials</p>
+                </div>
+                <button
+                  disabled={!native || checking}
+                  onClick={() => void checkRuntimes()}
+                >
+                  {checking ? "กำลังตรวจ…" : "Check runtimes"}
+                </button>
+              </div>
+              {diagnostics.length ? (
+                <ul className="rows">
                   {diagnostics.map((item) => (
-                    <article className="runtime-row" key={item.adapter}>
-                      <div>
+                    <li className="row-item" key={item.adapter}>
+                      <div className="row-main">
                         <h3>
-                          {item.adapter.toUpperCase()}{" "}
-                          <span className="tag">
-                            {item.installed ? "INSTALLED" : "MISSING"}
-                          </span>
+                          {adapterNames[item.adapter] ?? item.adapter}
                         </h3>
-                        <p>
+                        <p className="muted">
                           {item.version || "Version unavailable"} · Auth:{" "}
                           {item.authentication}
                         </p>
-                        <small>{item.message}</small>
-                        {item.executable && <code>{item.executable}</code>}
+                        <p className="hint">{item.message}</p>
+                        {item.executable && (
+                          <code className="path">{item.executable}</code>
+                        )}
                       </div>
-                      <span className="state">
-                        {item.supported ? "SUPPORTED" : "UNAVAILABLE"}
+                      <span
+                        className="chip"
+                        data-tone={
+                          item.installed && item.supported ? "ok" : "bad"
+                        }
+                      >
+                        <span className="dot" />
+                        {!item.installed
+                          ? "Missing"
+                          : item.supported
+                            ? "Ready"
+                            : "Unsupported"}
                       </span>
-                    </article>
+                    </li>
                   ))}
-                </section>
+                </ul>
+              ) : (
+                <p className="hint">ยังไม่ได้ตรวจ CLI ใน session นี้</p>
+              )}
+              <p className="db-path">
+                <span>Database</span>
+                <code>{data.dataPath || "ยังไม่เชื่อมต่อ Desktop"}</code>
+              </p>
+            </section>
+
+            {native && (
+              <div className="span-4 remote-slot">
+                <RemotePanel projects={data.projects} />
               </div>
-              <aside className="panel activity">
-                <div className="section-heading">
-                  <div>
-                    <h2>Execution activity</h2>
-                    <p className="muted">Recent 100 runs · local history</p>
-                  </div>
-                </div>
-                <ActivityTabs groups={groups} />
-                <div className="boundary-note">
-                  <h3>คุณเป็นผู้อนุมัติ</h3>
-                  <p>
-                    ใช้ read-only / staged writing ไม่มี push, deploy หรือ
-                    remote terminal
-                  </p>
-                </div>
-              </aside>
-            </div>
-            {native && <RemotePanel projects={data.projects} />}
-            <QueueBoard
-              data={data}
-              onRefresh={refresh}
-              onExecution={setSelectedRun}
-            />
-            <section className="panel" id="monitor" tabIndex={-1}>
-              <div className="section-heading">
+            )}
+
+            <section className="tile span-12" id="monitor" tabIndex={-1}>
+              <div className="tile-head">
                 <div>
                   <h2>Execution monitor</h2>
-                  <p className="muted">
-                    Actual persisted events · sensitive patterns redacted
-                  </p>
+                  <p>Events จริงที่บันทึกไว้ · ปิดบังรูปแบบข้อมูลอ่อนไหว</p>
                 </div>
-                {run?.status === "running" && (
-                  <button
-                    className="danger"
-                    onClick={() => {
-                      void bridge
-                        .cancel(run.id)
-                        .then(() => setNotice("ส่ง cancellation request แล้ว"))
-                        .catch((cause) => setError(displayError(cause)));
-                    }}
-                  >
-                    Cancel execution
-                  </button>
-                )}
+                <div className="tile-actions monitor-controls">
+                  <label className="inline-select">
+                    Execution
+                    <select
+                      value={selectedRun}
+                      onChange={(event) => setSelectedRun(event.target.value)}
+                    >
+                      <option value="">เลือก execution เพื่อดู logs</option>
+                      {data.executions.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.adapter === "mock" ? "[MOCK] " : ""}
+                          {item.agentId} · {item.status} · {item.id.slice(0, 8)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {run?.status === "running" && (
+                    <button
+                      className="danger"
+                      onClick={() => {
+                        void bridge
+                          .cancel(run.id)
+                          .then(() => setNotice("ส่ง cancellation request แล้ว"))
+                          .catch((cause) => setError(displayError(cause)));
+                      }}
+                    >
+                      Cancel execution
+                    </button>
+                  )}
+                </div>
               </div>
-              <label>
-                Execution
-                <select
-                  value={selectedRun}
-                  onChange={(event) => setSelectedRun(event.target.value)}
-                >
-                  <option value="">เลือก execution เพื่อดู logs</option>
-                  {data.executions.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.adapter === "mock" ? "[MOCK] " : ""}
-                      {item.agentId} · {item.status} · {item.id.slice(0, 8)}
-                    </option>
-                  ))}
-                </select>
-              </label>
               {run && (
                 <p className="run-meta">
-                  {run.adapter === "mock"
-                    ? "MOCK — no AI model"
-                    : (runtimeLabels[run.adapter] ?? run.adapter)}{" "}
-                  · {run.status} · PID {run.pid ?? "—"}
-                  {run.error && (
-                    <span className="error-text"> · {run.error}</span>
-                  )}
+                  <span className="chip">
+                    {run.adapter === "mock"
+                      ? "MOCK — no AI model"
+                      : (runtimeLabels[run.adapter] ?? run.adapter)}
+                  </span>
+                  <span className="chip" data-tone={toneOf[run.status]}>
+                    <span className="dot" />
+                    {run.status}
+                  </span>
+                  <span className="chip">PID {run.pid ?? "—"}</span>
+                  {run.error && <span className="error-text">{run.error}</span>}
                 </p>
               )}
               <div
-                className="log-view"
+                className="log-view well"
                 role="region"
                 aria-label="Execution logs"
                 tabIndex={0}
@@ -621,16 +670,10 @@ export function App() {
                     </div>
                   ))
                 ) : (
-                  <p className="muted">
-                    ยังไม่มี events สำหรับ execution ที่เลือก
-                  </p>
+                  <p className="hint">ยังไม่มี events สำหรับ execution ที่เลือก</p>
                 )}
               </div>
             </section>
-            <footer>
-              CREWNEST · LOCAL-FIRST AI OPERATIONS{" "}
-              <span>{data.dataPath || "No Desktop database connected"}</span>
-            </footer>
           </main>
         </div>
       )}
@@ -677,7 +720,7 @@ export function App() {
                   disabled={busy}
                 />
               </label>
-              <p className="muted">
+              <p className="hint">
                 ขั้นต่อไปเปิด native picker การเลือก directory เป็นการอนุมัติ
                 workspace นี้
               </p>
@@ -784,12 +827,11 @@ export function App() {
                 />
                 ฉันอนุมัติ prompt นี้ใน workspace ที่เลือกแบบ read-only
               </label>
-              <p className="muted">
-                Mock ใช้เวลาประมาณ 15 วินาทีเพื่อให้ตรวจ logs และ cancellation
-                ได้ Runtime ต้องตรง agent: Codex สำหรับ ASTRA/VECTOR/SCOUT,
-                Claude สำหรับ FORGE, Antigravity สำหรับ MIRA หลังตรวจ
-                diagnostics จะมี native confirmation ก่อนเริ่ม ไม่รองรับ writing
-                หรือ high-risk actions
+              <p className="hint">
+                Runtime ต้องตรง agent: Codex สำหรับ ASTRA/VECTOR/SCOUT, Claude
+                สำหรับ FORGE, Antigravity สำหรับ MIRA · Mock ใช้ราว 15 วินาที ·
+                มี native confirmation ก่อนเริ่ม ไม่รองรับ writing หรือ high-risk
+                actions
               </p>
               <div className="modal-actions">
                 <button
@@ -830,10 +872,6 @@ export function App() {
                   <dt>Capabilities</dt>
                   <dd>{modal.capabilities.join(", ")}</dd>
                 </dl>
-                <p className="muted">
-                  Role records เก็บใน SQLite · Configuration editing อยู่ Phase
-                  2
-                </p>
               </div>
             </div>
           )}

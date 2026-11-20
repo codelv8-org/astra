@@ -1,4 +1,4 @@
-# คำสั่งพัฒนา CrewNest
+# คำสั่งพัฒนา Astra
 
 Phase 3 API/Web/pairing/test/deployment ดู [PHASE_3_REMOTE.md](docs/PHASE_3_REMOTE.md) คำสั่ง `pnpm api`, `pnpm web`, `pnpm build:api`, `pnpm build:web`, `pnpm test:remote` แยกจาก Desktop ต้องตั้ง TLS/DB environment ตามคู่มือ
 
@@ -35,6 +35,6 @@ Real queue/dependency/handoff smoke ใช้ Codex สอง tasks ใน works
 
 Real five-agent writing workflow: `powershell -NoProfile -ExecutionPolicy Bypass -File tools/cargo.ps1 -Action real-workflow` ใช้ synthetic workspace `.local/phase2-real-workflow/workspace` และ explicit test-harness approvals ไม่ใช่ owner UAT sign-off ใช้ account quota ของ Codex/Claude/Antigravity หากรันค้าง/failed จะหยุดและเก็บ state; หลังแก้เหตุแล้วใช้คำสั่งเดิมพร้อม `-RetryFailed` เพื่อขอ retry ที่ยังเหลือสิทธิ์ ห้ามใช้ flag นี้วนลูป
 
-Claude authentication: `claude auth status --json` (ตรวจ locally อย่าเผยแพร่ account metadata), `claude auth login` ให้เจ้าของทำ browser login เอง ไม่ใส่ token/password ใน CrewNest หรือ chat; กด Check runtimes หลัง login
+Claude authentication: `claude auth status --json` (ตรวจ locally อย่าเผยแพร่ account metadata), `claude auth login` ให้เจ้าของทำ browser login เอง ไม่ใส่ token/password ใน Astra หรือ chat; กด Check runtimes หลัง login
 
 หลัง workflow completed หากต้องการตรวจ source ที่ apply แล้วและ Node tests ซ้ำก่อน append SCOUT review/UAT/ASTRA summary ใหม่ ใช้ `powershell -NoProfile -ExecutionPolicy Bypass -File tools/cargo.ps1 -Action real-workflow -Reverify` มี paid runtime calls และ explicit test-harness approvals; ไม่ใช่ owner UAT sign-off ไม่รัน ASTRA plan/VECTOR/MIRA/FORGE ซ้ำ ไม่ override runtime command denial และไม่ overwrite trusted tests ที่เปลี่ยนจากต้นฉบับ

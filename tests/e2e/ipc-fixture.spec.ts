@@ -118,14 +118,14 @@ test("frontend IPC fixture: project, explicit approval, mock result and safe log
   page,
 }) => {
   await page.goto("/?view=console");
-  await page.getByRole("button", { name: "＋ Add project" }).click();
+  await page.getByRole("button", { name: "Add project" }).click();
   await page.getByLabel("ชื่อโปรเจกต์").fill("Fixture project");
   await page.getByLabel("Project objective").fill("UI integration test only");
   await page.getByRole("button", { name: "เลือก directory และสร้าง" }).click();
   await expect(
     page.getByRole("heading", { name: "Fixture project", exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "＋ New execution" }).click();
+  await page.getByRole("button", { name: "New execution" }).click();
   await page
     .getByRole("dialog")
     .getByRole("combobox", { name: "Project", exact: true })
@@ -164,10 +164,10 @@ test("frontend IPC fixture: failed start retains prompt and does not fabricate a
   page,
 }) => {
   await page.goto("/?view=console");
-  await page.getByRole("button", { name: "＋ Add project" }).click();
+  await page.getByRole("button", { name: "Add project" }).click();
   await page.getByLabel("ชื่อโปรเจกต์").fill("Fixture project");
   await page.getByRole("button", { name: "เลือก directory และสร้าง" }).click();
-  await page.getByRole("button", { name: "＋ New execution" }).click();
+  await page.getByRole("button", { name: "New execution" }).click();
   await page
     .getByRole("dialog")
     .getByRole("combobox", { name: "Project", exact: true })

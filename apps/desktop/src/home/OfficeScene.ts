@@ -39,18 +39,18 @@ const statusColor: Record<SceneStatus, string> = {
 };
 const themes = {
   dark: {
-    bg: "#0b1020",
-    floor: "#141c30",
-    grid: "#2a3756",
-    desk: "#202a40",
-    wall: "#18213a",
+    bg: "#0b1730",
+    floor: "#122244",
+    grid: "#2a4170",
+    desk: "#1c2e55",
+    wall: "#14264a",
   },
   light: {
-    bg: "#e8edf6",
-    floor: "#f7f9fd",
-    grid: "#c9d4e6",
-    desk: "#dfe6f2",
-    wall: "#d3dcec",
+    bg: "#e6ecf6",
+    floor: "#f6f8fc",
+    grid: "#c6d3e8",
+    desk: "#dce5f3",
+    wall: "#d0dbee",
   },
 };
 

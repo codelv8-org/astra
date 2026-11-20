@@ -6,6 +6,12 @@
       "runtimeExecutable": "corepack",
       "runtimeArgs": ["pnpm", "--filter", "@crewnest/desktop", "dev"],
       "port": 1420
+    },
+    {
+      "name": "web-ui",
+      "runtimeExecutable": "corepack",
+      "runtimeArgs": ["pnpm", "--filter", "@crewnest/web", "dev", "--port", "5173", "--strictPort"],
+      "port": 5173
     }
   ]
 }

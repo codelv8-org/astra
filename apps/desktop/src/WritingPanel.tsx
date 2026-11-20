@@ -59,9 +59,9 @@ export function WritingPanel({
     }
   }
   return (
-    <section aria-label="FORGE writing approval">
+    <section aria-label="FORGE writing approval" className="writing well">
       <h3>FORGE · Staged writing</h3>
-      <p className="muted">
+      <p className="hint">
         Claude สร้างไฟล์เป็นข้อเสนอ โดยไม่ใช้ tools; Rust เขียนหลัง human
         ตรวจเนื้อหาจริงและอนุมัติอีกครั้งเท่านั้น
       </p>

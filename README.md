@@ -1,4 +1,6 @@
-# CrewNest — AI Agent Command Center
+# Astra — AI Agent Command Center
+
+> ชื่อผลิตภัณฑ์เดิมคือ CrewNest ตัวระบุภายใน (`@crewnest/*`, `crewnest_core`, `CREWNEST_*`, `local.crewnest.desktop`, `crewnest.db`) คงไว้เพื่อรักษาข้อมูลและการจับคู่เดิม
 
 แพลตฟอร์ม local-first สำหรับควบคุมและประสานงาน AI agents โดยใช้ตัวละครหุ่นยนต์ต้นฉบับ **CrewBots** เป็นอัตลักษณ์
 

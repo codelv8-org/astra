@@ -14,7 +14,7 @@ function call<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   if (!desktopAvailable())
     return Promise.reject(
       new Error(
-        "เปิด CrewNest Desktop เพื่อใช้ local execution; browser preview ไม่มี Desktop Core",
+        "เปิด Astra Desktop เพื่อใช้ local execution; browser preview ไม่มี Desktop Core",
       ),
     );
   return invoke<T>(command, args);

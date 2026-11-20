@@ -9,6 +9,16 @@ import { Modal } from "../../../packages/ui/src/Modal";
 import { bridge, desktopAvailable } from "./bridge";
 import { WritingPanel } from "./WritingPanel";
 
+const laneTone: Record<string, string> = {
+  running: "run",
+  queued: "run",
+  ready: "wait",
+  needs_review: "wait",
+  blocked: "wait",
+  failed: "bad",
+  completed: "ok",
+};
+
 export function QueueBoard({
   data,
   onRefresh,
@@ -102,34 +112,28 @@ export function QueueBoard({
       ? (tasks.find((t) => t.id === modal.id) ?? modal)
       : null;
   const columns = [
-    ["รออนุมัติ / Blocked", ["draft", "ready", "blocked"]],
-    ["Queued / Running", ["queued", "running"]],
-    ["Review / Results", ["needs_review", "completed", "failed", "canceled"]],
+    ["รออนุมัติ", ["draft", "ready", "blocked"]],
+    ["กำลังทำ", ["queued", "running"]],
+    ["ตรวจ / ผลลัพธ์", ["needs_review", "completed", "failed", "canceled"]],
   ] as const;
+  const paused = data.schedulerPaused ?? true;
+  const visible = tasks.filter((t) => !filter || t.workflowId === filter);
   return (
-    <section className="panel queue-panel" id="tasks">
-      <div className="section-heading">
+    <section className="tile queue-panel" id="tasks">
+      <div className="tile-head">
         <div>
           <h2>Task queue & workflows</h2>
-          <p className="muted">
-            {(data.schedulerPaused ?? true)
-              ? "Scheduling paused"
-              : "Scheduling active"}{" "}
-            · Read-only / staged writing · Human approval gates
+          <p>
+            {paused ? "Scheduling paused" : "Scheduling active"} · read-only /
+            staged writing · human gates
           </p>
         </div>
-        <div className="queue-actions">
+        <div className="tile-actions">
           <button
             disabled={!desktopAvailable() || busy}
-            onClick={() =>
-              void perform(() =>
-                bridge.scheduling(!(data.schedulerPaused ?? true)),
-              )
-            }
+            onClick={() => void perform(() => bridge.scheduling(!paused))}
           >
-            {(data.schedulerPaused ?? true)
-              ? "Resume scheduling"
-              : "Pause scheduling"}
+            {paused ? "Resume scheduling" : "Pause scheduling"}
           </button>
           <button
             disabled={!desktopAvailable() || busy}
@@ -138,87 +142,98 @@ export function QueueBoard({
               setModal("task");
             }}
           >
-            ＋ Add task
+            <span className="plus" aria-hidden="true">
+              ＋
+            </span>
+            Add task
           </button>
           <button
+            className="primary"
             disabled={!desktopAvailable() || busy}
             onClick={() => {
               setError("");
               setModal("workflow");
             }}
           >
-            ＋ New workflow
+            <span className="plus" aria-hidden="true">
+              ＋
+            </span>
+            New workflow
           </button>
         </div>
       </div>
-      <p className="muted">
-        Pause หยุดเฉพาะงานใหม่ · Resume scheduling ไม่ใช่ resume session · FORGE
-        ส่ง staged patch ให้ human ตรวจและอนุมัติก่อน Rust Core เขียนไฟล์
-      </p>
       {!modal && error && (
         <p className="error" role="alert">
           {error}
         </p>
       )}
-      <label>
-        Workflow filter
-        <select value={filter} onChange={(e) => setFilter(e.target.value)}>
-          <option value="">All tasks</option>
-          {workflows.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.objective.slice(0, 60)} · {f.status} · rework {f.reworkCount}/2
-            </option>
-          ))}
-        </select>
-      </label>
+      <div className="queue-toolbar">
+        <label className="inline-select">
+          Workflow filter
+          <select value={filter} onChange={(e) => setFilter(e.target.value)}>
+            <option value="">All tasks</option>
+            {workflows.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.objective.slice(0, 60)} · {f.status} · rework{" "}
+                {f.reworkCount}/2
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="hint">
+          Pause หยุดเฉพาะงานใหม่ · FORGE ส่ง staged patch ให้คุณตรวจก่อน Core
+          เขียนไฟล์
+        </p>
+      </div>
       <div className="queue-columns">
-        {columns.map(([title, states]) => (
-          <section key={title} aria-label={title}>
-            <h3>{title}</h3>
-            {tasks
-              .filter(
-                (t) =>
-                  (!filter || t.workflowId === filter) &&
-                  (states as readonly string[]).includes(t.status),
-              )
-              .map((task) => (
+        {columns.map(([title, states]) => {
+          const items = visible.filter((t) =>
+            (states as readonly string[]).includes(t.status),
+          );
+          return (
+            <section key={title} aria-label={title} className="lane well">
+              <h3>
+                {title} <span className="count">{items.length}</span>
+              </h3>
+              {items.map((task) => (
                 <button
                   className="queue-card"
                   key={task.id}
+                  data-tone={laneTone[task.status] ?? "idle"}
                   onClick={() => {
                     setError("");
                     setNote("");
                     setModal(task);
                   }}
                 >
-                  <span>
+                  <span className="queue-title">
                     <img
                       src={`/crewbots/${task.agentId}/icon.svg`}
-                      width="28"
-                      height="28"
+                      width="22"
+                      height="22"
                       alt=""
                     />
-                    {task.title}
+                    <b>{task.title}</b>
                   </span>
-                  <small>
+                  <span className="queue-meta">
+                    <span className="dot" />
                     {task.adapter === "mock" ? "MOCK · " : ""}
                     {task.status}
-                    {task.gate ? " · HUMAN GATE" : ""} · P{task.priority}
-                  </small>
-                  <small>
-                    Attempts {task.attempts}/{task.retryLimit + 1} ·{" "}
-                    {task.dependencies.length} dependencies
-                  </small>
-                  {task.blocker && <small>{task.blocker}</small>}
+                    {task.gate ? " · HUMAN GATE" : ""} · P{task.priority} ·{" "}
+                    {task.attempts}/{task.retryLimit + 1} tries ·{" "}
+                    {task.dependencies.length} deps
+                  </span>
+                  {task.blocker && (
+                    <span className="queue-blocker">{task.blocker}</span>
+                  )}
                 </button>
               ))}
-            {!tasks.some(
-              (t) =>
-                (!filter || t.workflowId === filter) &&
-                (states as readonly string[]).includes(t.status),
-            ) && <p className="muted">ยังไม่มี task ในสถานะนี้</p>}
-          </section>
-        ))}
+              {!items.length && (
+                <p className="hint lane-empty">ยังไม่มี task ในสถานะนี้</p>
+              )}
+            </section>
+          );
+        })}
       </div>
       {modal && (
         <Modal
@@ -246,13 +261,13 @@ export function QueueBoard({
                 · {selected.status} · {selected.step}
               </p>
               <pre className="task-prompt">{selected.prompt}</pre>
-              <p className="muted">
+              <p className="hint">
                 Dependencies:{" "}
                 {selected.dependencies
                   .map((id) => tasks.find((t) => t.id === id)?.title ?? id)
                   .join(", ") || "None"}
               </p>
-              <p className="muted">{selected.blocker}</p>
+              <p className="hint">{selected.blocker}</p>
               {selected.step === "review" &&
                 ["draft", "ready", "blocked"].includes(selected.status) && (
                   <section>
@@ -284,7 +299,7 @@ export function QueueBoard({
                     </button>
                   </section>
                 )}
-              <div className="queue-actions">
+              <div className="modal-actions start">
                 {["draft", "ready", "blocked"].includes(selected.status) && (
                   <button
                     disabled={busy}
@@ -361,7 +376,7 @@ export function QueueBoard({
                         onChange={(e) => setNote(e.target.value)}
                       />
                     </label>
-                    <div className="queue-actions">
+                    <div className="modal-actions start">
                       <button
                         disabled={busy || !note.trim()}
                         onClick={() =>
@@ -439,7 +454,7 @@ export function QueueBoard({
                     <input type="checkbox" name="mock" defaultChecked />
                     ใช้ Mock Adapter ทั้ง workflow (ไม่มี real AI results)
                   </label>
-                  <p className="muted">
+                  <p className="hint">
                     Full team มี plan/UAT gates; Approved writing ใช้
                     objective/แบบที่เจ้าของอนุมัติแล้ว เริ่ม FORGE
                     โดยยังต้องอนุมัติ scope, run, exact patch และ UAT
@@ -527,7 +542,7 @@ export function QueueBoard({
                       ))}
                     </select>
                   </label>
-                  <p className="muted">
+                  <p className="hint">
                     Dependencies ต้องอยู่ project เดียวกัน; task
                     ที่สร้างใหม่อ้างได้เฉพาะ task เดิม จึงไม่สร้าง cyclic graph
                   </p>

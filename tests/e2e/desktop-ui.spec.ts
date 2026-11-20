@@ -7,7 +7,7 @@ test("preview never exposes functional local execution and shows five CrewBots",
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/?view=console");
   await expect(
-    page.getByRole("button", { name: "＋ New execution" }),
+    page.getByRole("button", { name: "New execution" }),
   ).toBeDisabled();
   for (const name of ["ASTRA", "FORGE", "MIRA", "VECTOR", "SCOUT"])
     await expect(
@@ -82,7 +82,7 @@ for (const theme of ["dark", "light"])
       )
       .toBe(false);
     await page.screenshot({
-      path: `test-results/crewnest-${theme}-375.png`,
+      path: `test-results/astra-${theme}-375.png`,
       fullPage: true,
     });
   });
