@@ -547,3 +547,16 @@ button.link.back {
     display: none;
   }
 }
+
+/* GPU แบบ software (CI/VM ไม่มี GPU): blur เหนือ canvas ที่วาดใหม่ทุกเฟรมต้องคอมโพสิตด้วย CPU
+   จึงใช้พื้นทึบแบบเดียวกับ prefers-reduced-transparency และหยุดพื้นหลังเคลื่อนไหว */
+html:has(.home-stage[data-quality="low"]) body::before {
+  animation: none;
+}
+.home:has(> .home-stage[data-quality="low"]) :is(.glass, .tile, .bot-label) {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.home:has(> .home-stage[data-quality="low"]) :is(.glass, .tile, .bot-label) {
+  background: var(--tile-solid);
+}
