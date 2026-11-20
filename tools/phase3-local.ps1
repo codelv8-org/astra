@@ -40,8 +40,10 @@ if($Action -eq 'setup'){
  & pnpm --filter '@crewnest/api' migrate
  if($LASTEXITCODE -ne 0){throw 'API migration failed'}
  $env:CREWNEST_OWNER_NAME=$config.ownerName;$env:CREWNEST_OWNER_PASSWORD=$config.ownerPassword
- & pnpm --filter '@crewnest/api' owner
+ & pnpm --filter '@crewnest/api' run owner
+ $ownerExitCode=$LASTEXITCODE
  Remove-Item Env:CREWNEST_OWNER_PASSWORD
+ if($ownerExitCode -ne 0){throw 'API owner bootstrap failed'}
  }
  if($Action -eq 'api'){ & pnpm api } else { & pnpm web }
 } else {& (Join-Path $pgBin 'pg_ctl.exe') -D (Join-Path $taskRoot 'pg') -m fast stop}

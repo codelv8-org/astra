@@ -13,7 +13,11 @@ async fn remote_status(
 ) -> Result<RemoteStatus, String> {
     let config = core.remote_config()?;
     Ok(RemoteStatus {
-        connection: service.status.lock().clone(),
+        connection: if config.is_some() {
+            service.status.lock().clone()
+        } else {
+            "not_configured".into()
+        },
         device_id: config.as_ref().map(|c| c.device_id.clone()),
         server: config.map(|c| c.server),
         shared: core.remote_shared()?,
@@ -33,7 +37,7 @@ async fn remote_pair(
         return Err("Forget existing pairing first".into());
     }
     crewnest_core::remote::server_url(&server)?;
-    if !app.dialog().message(format!("Pair with {server}? This grants remote submission/monitoring only for projects shared separately. Exact local task approval remains required. No remote terminal or remote writing approval.")).title("CrewNest — approve remote pairing").buttons(tauri_plugin_dialog::MessageDialogButtons::OkCancel).blocking_show(){return Err("Pairing canceled".into());}
+    if !app.dialog().message(format!("Pair with {server}? This grants remote submission/monitoring only for projects shared separately. Exact local task approval remains required. No remote terminal or remote writing approval.")).title("Astra — approve remote pairing").buttons(tauri_plugin_dialog::MessageDialogButtons::OkCancel).blocking_show(){return Err("Pairing canceled".into());}
     let ca = if custom_ca {
         let f = app
             .dialog()
@@ -62,6 +66,9 @@ async fn remote_connect(
     core: State<'_, Core>,
     service: State<'_, RemoteService>,
 ) -> Result<(), String> {
+    if service.status.lock().as_str() == "pairing_required" {
+        return Err("Forget the old pairing locally and pair again".into());
+    }
     let config = core.remote_config()?.ok_or("Pair device first")?;
     let token = credential(&config)?
         .get_password()
@@ -79,7 +86,7 @@ async fn remote_forget(
     core: State<'_, Core>,
     service: State<'_, RemoteService>,
 ) -> Result<(), String> {
-    if !app.dialog().message("Forget local pairing? Revoke the old device in Web to invalidate its server credential. Existing runs continue locally.").title("CrewNest — forget pairing").buttons(tauri_plugin_dialog::MessageDialogButtons::OkCancel).blocking_show(){return Err("Canceled".into());}
+    if !app.dialog().message("Forget local pairing? Revoke the old device in Web to invalidate its server credential. Existing runs continue locally.").title("Astra — forget pairing").buttons(tauri_plugin_dialog::MessageDialogButtons::OkCancel).blocking_show(){return Err("Canceled".into());}
     service.disconnect();
     if let Some(c) = core.remote_config()? {
         credential(&c)?
@@ -105,7 +112,7 @@ async fn remote_share(
     logs: bool,
 ) -> Result<(), String> {
     let p = core.store.project(&project_id)?;
-    if enabled&&!app.dialog().message(format!("Share {} metadata remotely? Logs/artifacts: {}. Outputs can contain project data; sanitization is not complete DLP. Only enable for content you allow to leave this device.",p.name,logs)).title("CrewNest — approve project sharing").buttons(tauri_plugin_dialog::MessageDialogButtons::OkCancel).blocking_show(){return Err("Sharing canceled".into());}
+    if enabled&&!app.dialog().message(format!("Share {} metadata remotely? Logs/artifacts: {}. Outputs can contain project data; sanitization is not complete DLP. Only enable for content you allow to leave this device.",p.name,logs)).title("Astra — approve project sharing").buttons(tauri_plugin_dialog::MessageDialogButtons::OkCancel).blocking_show(){return Err("Sharing canceled".into());}
     core.share_remote_project(&project_id, enabled, logs)
 }
 
@@ -144,7 +151,7 @@ async fn create_project(
     let selected = tauri::async_runtime::spawn_blocking(move || {
         app.dialog()
             .file()
-            .set_title("CrewNest — approve a local project directory")
+            .set_title("Astra — approve a local project directory")
             .blocking_pick_folder()
     })
     .await
@@ -184,7 +191,7 @@ async fn start_run(
     let approved = tauri::async_runtime::spawn_blocking(move || {
         app.dialog()
             .message(content)
-            .title("CrewNest — approve this execution")
+            .title("Astra — approve this execution")
             .buttons(tauri_plugin_dialog::MessageDialogButtons::OkCancel)
             .blocking_show()
     })
@@ -248,7 +255,7 @@ async fn queue_action(
             let approved = tauri::async_runtime::spawn_blocking(move || {
                 app.dialog()
                     .message(message)
-                    .title("CrewNest — approve queue task / human gate")
+                    .title("Astra — approve queue task / human gate")
                     .buttons(tauri_plugin_dialog::MessageDialogButtons::OkCancel)
                     .blocking_show()
             })
@@ -314,7 +321,7 @@ async fn configure_writing(
     let approved = tauri::async_runtime::spawn_blocking(move || {
         app.dialog()
             .message(content)
-            .title("CrewNest — approve writing scope")
+            .title("Astra — approve writing scope")
             .buttons(tauri_plugin_dialog::MessageDialogButtons::OkCancel)
             .blocking_show()
     })
@@ -346,7 +353,7 @@ async fn writing_action(
     let approved = tauri::async_runtime::spawn_blocking(move || {
         app.dialog()
             .message(content)
-            .title("CrewNest — approve exact file changes")
+            .title("Astra — approve exact file changes")
             .buttons(tauri_plugin_dialog::MessageDialogButtons::OkCancel)
             .blocking_show()
     })
@@ -428,7 +435,7 @@ fn main() {
             writing_action
         ])
         .run(tauri::generate_context!())
-        .expect("CrewNest desktop failed");
+        .expect("Astra desktop failed");
 }
 
 #[cfg(test)]

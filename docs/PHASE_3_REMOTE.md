@@ -33,7 +33,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/phase3-local.ps1 -Acti
 5. Web ส่งงานเป็น draft → Desktop task detail ตรวจ exact prompt และ approve ในเครื่อง → Web Start เฉพาะ queued task ที่ approved แล้ว หาก local scheduler active อาจเริ่มงานเองหลัง approval ตามพฤติกรรม Phase 2; ใช้ Pause scheduling ในเครื่องเพื่อทดสอบ remote Start แยก
 6. Web Cancel / Pause future scheduling / Refresh status ทำได้ตามสิทธิ์ owner และ local project policy Remote ไม่กำหนด binary/path/CLI args ไม่อนุมัติ human gates, writing apply/rollback หรือ high-risk actions; ให้ทำผ่าน Desktop
 7. Desktop ต้องเปิดและ Windows ไม่ sleep/offline ข้อมูล connection ใช้ active socket + heartbeat; การออนไลน์ของเครื่องไม่ได้รับรอง runtime CLI authentication จนตรวจ/execute จริง
-8. Revoke ใน Web ตัด connection และ invalidate credential/pending commands งาน local ที่เริ่มแล้วไม่ถูก terminate ด้วย revoke; ใช้ cancellation ก่อน revoke หากต้องการหยุดงาน Forget pairing locally ลบ credential ในเครื่อง ไม่แทน server revoke
+8. Revoke ใน Web ตัด connection และ invalidate credential/pending commands หากต้องหยุดงาน local ให้ Cancel ก่อน revoke เมื่อ Desktop ได้รับ revoke หรือ HTTP 401 จะหยุด reconnect และแจ้งให้จับคู่ใหม่ ให้กด Forget pairing locally แล้วใช้ pairing code ใหม่จาก Web การลืมการจับคู่ในเครื่องลบ credential ฝั่ง Desktop เท่านั้น
+
+## ตรวจเวลา Windows และ Docker/WSL
+
+หากส่งคำสั่งแล้วพบ `Expired or invalid command lifetime` ให้เทียบ UTC ของ Windows, WSL และ API container พร้อมตรวจ Windows System Event Log และแหล่งเวลาที่ `systemd-timesyncd` ใช้ ตั้งให้ Windows และ API อ้างอิงแหล่งเวลาที่ผู้ดูแลเครื่องอนุมัติก่อนใช้งานต่อเนื่อง ผลตรวจเครื่องทดสอบและวิธีที่ใช้ซิงก์ชั่วคราวอยู่ใน [PHASE_3_REPORT.md](PHASE_3_REPORT.md)
 
 ## Ownership / contracts / trust boundaries
 
@@ -75,7 +79,7 @@ pnpm build:web
 pnpm desktop:build
 ```
 
-API build อยู่ `apps/api/dist/apps/api/src/main.js`; รันผ่าน `pnpm --filter @crewnest/api start` ต้องตั้ง environment ตาม `apps/api/.env.example` โดย process manager ของเครื่อง ไม่โหลด `.env` เข้า source อัตโนมัติ ใช้ `pnpm --filter @crewnest/api migrate` ก่อนเริ่ม service และ `owner` พร้อม `CREWNEST_OWNER_NAME` / `CREWNEST_OWNER_PASSWORD` แบบ local bootstrap ไม่เปิด registration endpoint
+API build อยู่ `apps/api/dist/apps/api/src/main.js` รันผ่าน `pnpm --filter @crewnest/api start` โดยตั้ง environment ตาม `apps/api/.env.example` ใช้ `pnpm --filter @crewnest/api migrate` ก่อนเริ่ม service และ `pnpm --filter @crewnest/api run owner` พร้อม `CREWNEST_OWNER_NAME` / `CREWNEST_OWNER_PASSWORD` สำหรับ local bootstrap
 
 Web build เป็น static `apps/web/dist` deploy แยกได้ ผ่าน HTTPS origin ของตัวเองและ reverse proxy `/api` ไป API HTTPS ที่ตรวจ certificate ถูกต้อง ไม่มี frontend API secrets ใช้ cookie same-origin ไม่เปิด wildcard CORS `infra/web.conf.template` เป็นตัวอย่าง Nginx รวม CSP/TLS; public API device URL ต้องเข้าถึง WSS route ได้
 
@@ -84,11 +88,13 @@ Docker Compose ตัวอย่างที่ `infra/compose.yaml` แยก 
 ```powershell
 docker compose -f infra/compose.yaml up -d postgres
 docker compose -f infra/compose.yaml run --rm api pnpm --filter @crewnest/api migrate
-docker compose -f infra/compose.yaml run --rm -e CREWNEST_OWNER_NAME -e CREWNEST_OWNER_PASSWORD api pnpm --filter @crewnest/api owner
+docker compose -f infra/compose.yaml run --rm -e CREWNEST_OWNER_NAME -e CREWNEST_OWNER_PASSWORD api pnpm --filter @crewnest/api run owner
 docker compose -f infra/compose.yaml up -d api web
 ```
 
-Compose bind ports เฉพาะ loopback เป็นค่าเริ่มต้น ต้องจัดการ trusted public ingress และ Web origin ของ deployment เอง ห้ามเปิด database port สู่ Internet Docker/public deployment ยังไม่ใช่ผลทดสอบบนเครื่องนี้
+Compose bind ports เฉพาะ loopback เป็นค่าเริ่มต้น สำหรับ staging ให้ใช้ trusted public ingress และตั้ง Web origin ให้ตรงกับ URL ที่ผู้ใช้เปิด เก็บ PostgreSQL บนเครือข่ายภายใน
+
+ตรวจเวลา UTC ของ Windows Desktop และ API container ก่อน UAT ด้วย `Get-Date -AsUTC` และ `docker compose -f infra/compose.yaml exec api date -u` หาก API ส่งคำสั่งที่มีเวลาออกคำสั่งล่วงหน้าเกิน 5 วินาทีตามนาฬิกา Desktop หรือคำสั่งหมดอายุ Desktop จะปฏิเสธ แม้ pairing และ WSS จะเชื่อมต่อได้ ให้ซิงก์เวลาของทั้งสองระบบแล้วทดสอบใหม่
 
 ## Tests / rollback
 

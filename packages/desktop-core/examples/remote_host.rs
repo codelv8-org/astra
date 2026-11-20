@@ -63,6 +63,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             "disconnect" => service.disconnect(),
+            "verify revoked" => {
+                let wait_for_terminal = |client: RemoteService| async move {
+                    tokio::time::timeout(std::time::Duration::from_secs(12), async {
+                        while client.running.load(std::sync::atomic::Ordering::SeqCst) {
+                            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                        }
+                    })
+                    .await
+                    .unwrap();
+                    assert_eq!(client.status.lock().as_str(), "pairing_required");
+                };
+                wait_for_terminal(service.clone()).await;
+                let fresh = RemoteService::default();
+                fresh.start(core.clone(), config.clone(), token.clone())?;
+                wait_for_terminal(fresh.clone()).await;
+                tokio::time::sleep(std::time::Duration::from_secs(4)).await;
+                assert!(!fresh.running.load(std::sync::atomic::Ordering::SeqCst));
+                assert_eq!(fresh.status.lock().as_str(), "pairing_required");
+                std::fs::write(
+                    root.join("revoked-verified.txt"),
+                    "close and HTTP 401 terminal",
+                )?;
+            }
             "connect" => {
                 while service.running.load(std::sync::atomic::Ordering::SeqCst) {
                     tokio::time::sleep(std::time::Duration::from_millis(100)).await;

@@ -81,8 +81,8 @@ test("queue UI fixture: create draft, inspect approval request and pause schedul
       },
     };
   }, agents);
-  await page.goto("/");
-  await page.getByRole("button", { name: "＋ Add task", exact: true }).click();
+  await page.goto("/?view=console");
+  await page.getByRole("button", { name: "Add task", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await dialog
     .getByRole("combobox", { name: "Project", exact: true })

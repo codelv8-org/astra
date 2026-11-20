@@ -5,9 +5,9 @@ test("preview never exposes functional local execution and shows five CrewBots",
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("/");
+  await page.goto("/?view=console");
   await expect(
-    page.getByRole("button", { name: "＋ New execution" }),
+    page.getByRole("button", { name: "New execution" }),
   ).toBeDisabled();
   for (const name of ["ASTRA", "FORGE", "MIRA", "VECTOR", "SCOUT"])
     await expect(
@@ -25,7 +25,7 @@ test("preview never exposes functional local execution and shows five CrewBots",
 test("agent modal supports keyboard close and returns focus", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/?view=console");
   const trigger = page.getByRole("button", { name: "รายละเอียด" }).first();
   await trigger.click();
   await expect(page.getByRole("dialog")).toBeVisible();
@@ -51,7 +51,7 @@ for (const theme of ["dark", "light"])
   }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.goto("/");
+    await page.goto("/?view=console");
     if (theme === "light")
       await page.getByRole("button", { name: "สลับ light/dark theme" }).click();
     expect(
@@ -82,7 +82,7 @@ for (const theme of ["dark", "light"])
       )
       .toBe(false);
     await page.screenshot({
-      path: `test-results/crewnest-${theme}-375.png`,
+      path: `test-results/astra-${theme}-375.png`,
       fullPage: true,
     });
   });

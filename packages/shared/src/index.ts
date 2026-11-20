@@ -99,6 +99,7 @@ export interface Snapshot {
     | "connected"
     | "connecting"
     | "disconnected"
+    | "pairing_required"
     | "offline";
 }
 
