@@ -33,6 +33,14 @@ pub struct WritingPatch {
     pub files: Vec<FileChange>,
 }
 
+impl WritingPatch {
+    pub fn digest(&self) -> Result<String> {
+        serde_json::to_string(self)
+            .map(|serialized| hash(&serialized))
+            .map_err(|e| e.to_string())
+    }
+}
+
 fn hash(text: &str) -> String {
     format!("{:x}", Sha256::digest(text.as_bytes()))
 }
@@ -273,10 +281,7 @@ impl Store {
         self.task_event(id,"patch_staged","FORGE output staged; files unchanged until human reviews exact content and approves apply")
     }
     pub fn patch_digest(&self, id: &str) -> Result<String> {
-        Ok(hash(
-            &serde_json::to_string(&self.patch(id)?.ok_or("No staged patch")?)
-                .map_err(|e| e.to_string())?,
-        ))
+        self.patch(id)?.ok_or("No staged patch")?.digest()
     }
     pub fn apply_patch(&self, id: &str, digest: &str) -> Result<()> {
         let _guard = self.queue_lock.lock();

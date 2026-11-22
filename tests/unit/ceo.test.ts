@@ -1,11 +1,22 @@
 import { describe, it, expect } from "vitest";
-import type { QueueTask, Snapshot, Agent } from "../../packages/shared/src";
+import type {
+  QueueTask,
+  Snapshot,
+  Agent,
+  ExecutionEvent,
+} from "../../packages/shared/src";
+import { readExecutionResult } from "../../apps/desktop/src/executionResult";
 import agents from "../../packages/shared/default-agents.json";
 import {
+  agentResultCandidates,
   changeReports,
+  chatApprovalLabel,
   diffTasks,
   displayPath,
+  handoffRoute,
+  handoffStatus,
   isProgressQuery,
+  pendingChatApprovals,
   progressOf,
   progressReport,
   sceneAgents,
@@ -75,6 +86,60 @@ function snapshot(tasks: QueueTask[]): Snapshot {
 }
 
 describe("Home CEO reports", () => {
+  it("offers confirmations only for an active workflow's actionable tasks", () => {
+    const active = new Set(["wf1"]);
+    const waiting = task(0, "ready");
+    expect(chatApprovalLabel(waiting, active)).toBe("ตรวจและอนุมัติ");
+    expect(chatApprovalLabel(waiting, new Set())).toBeNull();
+    expect(
+      chatApprovalLabel({ ...waiting, approved: true }, active),
+    ).toBeNull();
+    expect(chatApprovalLabel(task(2, "blocked"), active)).toBeNull();
+    expect(chatApprovalLabel(task(1, "ready"), active)).toBe("ยืนยันแผน");
+    expect(
+      chatApprovalLabel({ ...task(1, "ready"), step: "uat" }, active),
+    ).toBe("ยืนยัน UAT");
+    expect(
+      chatApprovalLabel({ ...task(2, "needs_review"), step: "review" }, active),
+    ).toBe("ตรวจและยืนยันผล");
+    expect(
+      chatApprovalLabel(
+        { ...waiting, step: "implement", agentId: "forge", adapter: "claude" },
+        active,
+      ),
+    ).toBe("ตรวจขอบเขตและอนุมัติ");
+    expect(
+      chatApprovalLabel(
+        {
+          ...waiting,
+          status: "needs_review",
+          step: "implement",
+          agentId: "forge",
+          adapter: "claude",
+        },
+        active,
+      ),
+    ).toBe("ตรวจและยืนยัน patch");
+  });
+  it("lists ready tasks only for the selected project and removes them after queueing", () => {
+    const other = { ...task(1, "ready"), projectId: "other", workflowId: null };
+    const first = task(0, "ready");
+    const active = new Set(["wf1"]);
+    expect(
+      pendingChatApprovals(
+        [first, task(2, "blocked"), other],
+        projectId,
+        active,
+      ),
+    ).toEqual([{ task: first, label: "ตรวจและอนุมัติ" }]);
+    expect(
+      pendingChatApprovals(
+        [{ ...first, status: "queued", approved: true }, other],
+        projectId,
+        active,
+      ),
+    ).toEqual([]);
+  });
   it("computes progress and current step from persisted task states", () => {
     const tasks = [
       task(0, "completed"),
@@ -118,6 +183,78 @@ describe("Home CEO reports", () => {
     expect(
       changeReports(diffTasks({}, [task(0, "draft")]), snapshot([])),
     ).toHaveLength(0);
+  });
+  it("shows the actual handoff through human approval without implying work started", () => {
+    const plan = task(0, "completed");
+    const approval = { ...task(1, "ready"), dependencies: [plan.id] };
+    const architecture = {
+      ...task(2, "blocked"),
+      dependencies: [approval.id],
+      blocker: "Waiting for dependencies / human gates",
+    };
+    const data = snapshot([plan, approval, architecture]);
+    const byId = new Map(data.tasks?.map((item) => [item.id, item]));
+    expect(handoffRoute(architecture, byId, data.agents)).toBe(
+      "ASTRA → ผู้อนุมัติ → VECTOR",
+    );
+    expect(handoffStatus(architecture)).toBe("รอขั้นก่อนหน้า");
+    const running = { ...architecture, status: "running", blocker: null };
+    expect(
+      changeReports(diffTasks(statusMap([architecture]), [running]), data),
+    ).toMatchObject([
+      {
+        from: "agent",
+        agentId: "vector",
+        source: "core",
+        text: expect.stringContaining("กำลังทำ"),
+      },
+    ]);
+  });
+  it("reads the latest runtime artifact for a non-CEO agent awaiting review", async () => {
+    const architecture = { ...task(2, "needs_review"), lastExecutionId: "run" };
+    const data = snapshot([architecture]);
+    data.executions = [
+      {
+        id: "run",
+        taskId: architecture.id,
+        agentId: "vector",
+        projectId,
+        adapter: "codex",
+        status: "completed",
+        prompt: "",
+        createdAt: "",
+        finishedAt: "",
+        error: null,
+        pid: null,
+        sessionId: null,
+      },
+    ];
+    expect(agentResultCandidates(data, new Set())).toMatchObject([
+      { task: { agentId: "vector" } },
+    ]);
+    expect(agentResultCandidates(data, new Set(["run"]))).toEqual([]);
+    data.executions[0].status = "failed";
+    expect(agentResultCandidates(data, new Set())).toEqual([]);
+    const event = (id: number, kind: string): ExecutionEvent => ({
+      id,
+      kind,
+      executionId: "run",
+      text: kind,
+      createdAt: "",
+    });
+    const oldPage = Array.from({ length: 500 }, (_, index) =>
+      event(index + 1, "stdout"),
+    );
+    oldPage[0] = event(1, "artifact");
+    const artifact = event(501, "artifact");
+    const cursors: number[] = [];
+    expect(
+      await readExecutionResult(async (after) => {
+        cursors.push(after);
+        return after === 0 ? oldPage : [artifact, event(502, "stderr")];
+      }),
+    ).toEqual(artifact);
+    expect(cursors).toEqual([0, 500]);
   });
   it("maps agents to 3D states from tasks", () => {
     const states = sceneAgents(

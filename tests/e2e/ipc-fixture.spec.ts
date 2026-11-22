@@ -53,6 +53,9 @@ test.beforeEach(async ({ page }) => {
               executable: null,
             },
           ];
+        if (cmd === "pick_folder") return "FIXTURE_ONLY/approved-workspace";
+        if (cmd === "inspect_folder")
+          return { path: args.path, repoRoot: args.path, isGit: true, warning: null };
         if (cmd === "create_project") {
           const project = {
             id: "ef574f51-d65f-4ce8-b3d8-c1bd53e51af4",
@@ -61,6 +64,17 @@ test.beforeEach(async ({ page }) => {
             path: "FIXTURE_ONLY/approved-workspace",
             isGit: true,
             createdAt: new Date().toISOString(),
+            folders: [
+              {
+                id: "fixture-folder",
+                path: "FIXTURE_ONLY/approved-workspace",
+                repoRoot: "FIXTURE_ONLY/approved-workspace",
+                isGit: true,
+                isPrimary: true,
+                position: 0,
+                exists: true,
+              },
+            ],
           };
           snapshot.projects.push(project);
           return structuredClone(project);
@@ -104,7 +118,7 @@ test.beforeEach(async ({ page }) => {
 test("Desktop แจ้งให้จับคู่ใหม่หลัง revoke และเปิดฟอร์มเมื่อลืมการจับคู่เดิม", async ({
   page,
 }) => {
-  await page.goto("/?view=console&fixture-revoked");
+  await page.goto("/?view=console&page=remote&fixture-revoked");
   await expect(page.getByRole("alert")).toContainText("pairing code ใหม่");
   await expect(
     page.getByRole("button", { name: "Connect remote", exact: true }),
@@ -117,11 +131,12 @@ test("Desktop แจ้งให้จับคู่ใหม่หลัง re
 test("frontend IPC fixture: project, explicit approval, mock result and safe log rendering", async ({
   page,
 }) => {
-  await page.goto("/?view=console");
+  await page.goto("/?view=console&page=projects");
   await page.getByRole("button", { name: "Add project" }).click();
   await page.getByLabel("ชื่อโปรเจกต์").fill("Fixture project");
   await page.getByLabel("Project objective").fill("UI integration test only");
-  await page.getByRole("button", { name: "เลือก directory และสร้าง" }).click();
+  await page.getByRole("button", { name: "+ เพิ่ม folder" }).click();
+  await page.getByRole("button", { name: "สร้างโปรเจกต์" }).click();
   await expect(
     page.getByRole("heading", { name: "Fixture project", exact: true }),
   ).toBeVisible();
@@ -163,10 +178,11 @@ test("frontend IPC fixture: project, explicit approval, mock result and safe log
 test("frontend IPC fixture: failed start retains prompt and does not fabricate a run", async ({
   page,
 }) => {
-  await page.goto("/?view=console");
+  await page.goto("/?view=console&page=projects");
   await page.getByRole("button", { name: "Add project" }).click();
   await page.getByLabel("ชื่อโปรเจกต์").fill("Fixture project");
-  await page.getByRole("button", { name: "เลือก directory และสร้าง" }).click();
+  await page.getByRole("button", { name: "+ เพิ่ม folder" }).click();
+  await page.getByRole("button", { name: "สร้างโปรเจกต์" }).click();
   await page.getByRole("button", { name: "New execution" }).click();
   await page
     .getByRole("dialog")

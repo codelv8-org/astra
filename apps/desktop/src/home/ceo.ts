@@ -6,11 +6,12 @@ import type {
   Workflow,
 } from "../../../../packages/shared/src";
 import type { SceneAgent, SceneStatus } from "./OfficeScene";
+import type { GenSpec } from "./genui/spec";
 
 /**
  * ตรรกะ CEO (ASTRA) บนหน้า Home
  * ข้อความรายงานสร้างจากสถานะที่ Core บันทึกจริงเท่านั้น ไม่สร้างผลงานหรือคำตอบ AI ขึ้นเอง
- * ผลลัพธ์ที่มาจาก model จริงจะถูกดึงจาก execution event ชนิด "result" และติดป้าย runtime
+ * ผลลัพธ์จาก runtime ดึงจาก artifact ที่ Core ใช้ส่งต่อระหว่างขั้นตอน
  */
 
 export const stepOrder = [
@@ -49,7 +50,8 @@ const waitingStates = new Set(["draft", "ready", "blocked", "needs_review"]);
 
 export interface ChatMessage {
   id: string;
-  from: "owner" | "ceo";
+  from: "owner" | "ceo" | "agent";
+  agentId?: string;
   text: string;
   at: string;
   /** core = รายงานจากสถานะ Core, model = ผลจาก runtime จริง, mock = Mock Adapter */
@@ -58,6 +60,7 @@ export interface ChatMessage {
   projectId?: string;
   workflowId?: string;
   link?: "queue";
+  genUI?: GenSpec;
 }
 
 export interface Progress {
@@ -109,6 +112,75 @@ export function describeTask(task: QueueTask, agents: Agent[]) {
   return `${stepLabels[task.step] ?? task.title} · ${agentName(agents, task.agentId)} · ${statusLabels[task.status] ?? task.status}`;
 }
 
+export function handoffStatus(task: QueueTask) {
+  if (
+    task.status === "blocked" &&
+    task.blocker === "Waiting for dependencies / human gates"
+  )
+    return "รอขั้นก่อนหน้า";
+  return statusLabels[task.status] ?? task.status;
+}
+
+export function chatApprovalLabel(
+  task: QueueTask,
+  activeWorkflows: ReadonlySet<string>,
+) {
+  if (task.workflowId && !activeWorkflows.has(task.workflowId)) return null;
+  if (task.status === "needs_review") {
+    if (task.step === "review") return "ตรวจและยืนยันผล";
+    if (task.agentId === "forge" && task.adapter === "claude")
+      return "ตรวจและยืนยัน patch";
+  }
+  if (task.status !== "ready" || task.approved) return null;
+  if (task.step === "plan_approval" && task.gate) return "ยืนยันแผน";
+  if (task.step === "uat" && task.gate) return "ยืนยัน UAT";
+  if (task.gate) return "ยืนยันขั้นตอน";
+  if (
+    task.step === "implement" &&
+    task.agentId === "forge" &&
+    task.adapter === "claude"
+  ) {
+    return "ตรวจขอบเขตและอนุมัติ";
+  }
+  return "ตรวจและอนุมัติ";
+}
+
+export function pendingChatApprovals(
+  tasks: QueueTask[],
+  projectId: string,
+  activeWorkflows: ReadonlySet<string>,
+) {
+  return sortTasks(
+    tasks.filter((task) => task.projectId === projectId),
+  ).flatMap((task) => {
+    const label = chatApprovalLabel(task, activeWorkflows);
+    return label ? [{ task, label }] : [];
+  });
+}
+
+export function handoffRoute(
+  task: QueueTask,
+  tasksById: ReadonlyMap<string, QueueTask>,
+  agents: Agent[],
+) {
+  const assignee = (item: QueueTask) =>
+    item.gate ? "ผู้อนุมัติ" : agentName(agents, item.agentId);
+  const senders = new Set(
+    task.dependencies.flatMap((id) => {
+      const parent = tasksById.get(id);
+      if (!parent) return [];
+      const beforeGate = parent.gate
+        ? parent.dependencies.flatMap((dependency) => {
+            const item = tasksById.get(dependency);
+            return item ? [assignee(item)] : [];
+          })
+        : [];
+      return [...beforeGate, assignee(parent)];
+    }),
+  );
+  return [...senders, assignee(task)].join(" → ");
+}
+
 /** สถานะหุ่นในฉาก 3D คำนวณจาก task/execution จริง */
 export function sceneAgents(data: Snapshot): SceneAgent[] {
   const tasks = data.tasks ?? [];
@@ -143,6 +215,7 @@ export function sceneAgents(data: Snapshot): SceneAgent[] {
       characterKey: agent.characterKey,
       status,
       activity,
+      runtime: agent.runtimeAdapter,
     };
   });
 }
@@ -177,31 +250,36 @@ export function changeReports(
     if (!change.from) continue; // task ใหม่ถูกรายงานตอนรับงานแล้ว
     // ร่าง → ติดขัด คือ Core จัดคิวรอ dependency ตอนสร้าง workflow ไม่ใช่ความคืบหน้า
     if (change.from === "draft" && change.to === "blocked") continue;
-    const key = change.task.workflowId ?? `task:${change.task.id}`;
+    const { task } = change;
+    const speaker = task.gate ? "astra" : task.agentId;
+    const key = `${task.workflowId ?? task.id}:${speaker}`;
     groups.set(key, [...(groups.get(key) ?? []), change]);
   }
   const tasks = data.tasks ?? [];
-  return [...groups.entries()].map(([key, list]) => {
-    const workflow = data.workflows?.find((item) => item.id === key);
+  return [...groups.values()].map((list) => {
+    const first = list[0].task;
+    const speaker = first.gate ? "astra" : first.agentId;
+    const workflow = data.workflows?.find(
+      (item) => item.id === first.workflowId,
+    );
     const project = data.projects.find(
       (item) => item.id === list[0].task.projectId,
     );
     const progress = progressOf(
       workflow
-        ? tasks.filter((task) => task.workflowId === key)
+        ? tasks.filter((task) => task.workflowId === workflow.id)
         : [list[0].task],
     );
     const lines = sortTasks(list.map((change) => change.task)).map((task) => {
       const change = list.find((item) => item.task.id === task.id)!;
-      return `• ${stepLabels[task.step] ?? task.title} (${agentName(data.agents, task.agentId)}): ${statusLabels[change.from!] ?? change.from} → ${statusLabels[change.to] ?? change.to}${task.blocker && ["blocked", "failed", "ready"].includes(task.status) ? ` — ${task.blocker}` : ""}`;
+      return `• ${stepLabels[task.step] ?? task.title} (${agentName(data.agents, task.agentId)}): ${statusLabels[change.from!] ?? change.from} → ${handoffStatus(task)}${task.blocker && ["blocked", "failed", "ready"].includes(task.status) ? ` — ${task.blocker}` : ""}`;
     });
-    const gate = list.some(
-      (change) =>
-        change.task.gate &&
-        ["ready", "needs_review"].includes(change.task.status),
+    const gate = list.some((change) =>
+      ["ready", "needs_review"].includes(change.task.status),
     );
     return {
-      from: "ceo" as const,
+      from: speaker === "astra" ? ("ceo" as const) : ("agent" as const),
+      agentId: speaker,
       source: "core" as const,
       projectId: list[0].task.projectId,
       workflowId: workflow?.id,
@@ -210,7 +288,7 @@ export function changeReports(
         `อัปเดต ${project?.name ?? "โปรเจกต์"}${workflow ? ` — “${clip(workflow.objective, 60)}”` : ""}`,
         ...lines,
         `ความคืบหน้า ${progress.completed}/${progress.total} ขั้น (${progress.percent}%)`,
-        gate ? "มีขั้นตอนที่ต้องให้คุณอนุมัติใน Task queue" : "",
+        gate ? "ตรวจรายการ “รอการยืนยัน” ในแชทเพื่ออนุมัติขั้นตอนนี้" : "",
       ]
         .filter(Boolean)
         .join("\n"),
@@ -280,7 +358,7 @@ export function acceptedReport(
     `รับงานแล้วครับ — ${project?.name ?? "โปรเจกต์"}`,
     `สร้าง workflow ${workflow.id.slice(0, 8)}${mock ? " แบบ MOCK (ไม่มี AI model)" : ""}`,
     `ลำดับงาน: ${steps}`,
-    "ทุกขั้นยังไม่เริ่มจนกว่าคุณอนุมัติใน Task queue ผมจะรายงานที่นี่เมื่อสถานะเปลี่ยน",
+    "ขั้นที่พร้อมจะขึ้นใน “รอการยืนยัน” ในแชท ผมจะรายงานที่นี่เมื่อสถานะเปลี่ยน",
   ].join("\n");
 }
 
@@ -291,26 +369,22 @@ export function isProgressQuery(text: string) {
   return value.length <= 60 && progressPattern.test(value);
 }
 
-/** task ของ ASTRA ที่เสร็จแล้วและมีผล model ให้ดึงมาแสดงในแชท */
-export function astraResultCandidates(
+/** ดึงผลจาก execution ที่สำเร็จ รวมถึงขั้นที่มีผลแล้วและกำลังรอตรวจ */
+export function agentResultCandidates(
   data: Snapshot,
   seen: Set<string>,
 ): { task: QueueTask; execution: Execution }[] {
-  return (data.tasks ?? [])
-    .filter(
-      (task) =>
-        task.agentId === "astra" &&
-        task.status === "completed" &&
-        task.lastExecutionId &&
-        !seen.has(task.lastExecutionId),
-    )
-    .map((task) => ({
-      task,
-      execution: data.executions.find(
-        (run) => run.id === task.lastExecutionId,
-      )!,
-    }))
-    .filter((item) => item.execution);
+  const tasks = new Map((data.tasks ?? []).map((task) => [task.id, task]));
+  return data.executions.flatMap((execution) => {
+    if (execution.status !== "completed" || seen.has(execution.id)) return [];
+    const task = tasks.get(execution.taskId);
+    return task &&
+      !task.gate &&
+      task.agentId === execution.agentId &&
+      (task.workflowId || task.agentId === "astra")
+      ? [{ task, execution }]
+      : [];
+  });
 }
 
 export function clip(text: string, length: number) {

@@ -5,27 +5,40 @@ test("preview never exposes functional local execution and shows five CrewBots",
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("/?view=console");
+  await page.goto("/?view=console&page=agents");
   await expect(
     page.getByRole("button", { name: "New execution" }),
   ).toBeDisabled();
+  // การ์ดโต๊ะงานหนึ่งใบต่อ CrewBot: ชื่อการ์ดคือบทบาท คำอธิบายคือชื่อ agent
   for (const name of ["ASTRA", "FORGE", "MIRA", "VECTOR", "SCOUT"])
     await expect(
-      page.getByRole("heading", { name, exact: true }),
+      page.getByRole("article", { description: new RegExp(`^${name}`) }),
     ).toBeVisible();
   await expect(
     page.getByText("Browser preview · Desktop required"),
   ).toBeVisible();
+  const runtime = page.getByRole("link", { name: "Runtime", exact: true });
+  await runtime.click();
+  await expect(runtime).toHaveAttribute("aria-current", "page");
+  await expect(
+    page.getByRole("heading", { name: "ลำดับการส่งต่องาน", exact: true }),
+  ).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Check runtimes" }),
   ).toBeDisabled();
+  await page.reload();
+  await expect(runtime).toHaveAttribute("aria-current", "page");
+  await page.goBack();
+  await expect(
+    page.getByRole("heading", { name: "ลำดับการส่งต่องาน", exact: true }),
+  ).toBeVisible();
   expect(errors).toEqual([]);
 });
 
 test("agent modal supports keyboard close and returns focus", async ({
   page,
 }) => {
-  await page.goto("/?view=console");
+  await page.goto("/?view=console&page=agents");
   const trigger = page.getByRole("button", { name: "รายละเอียด" }).first();
   await trigger.click();
   await expect(page.getByRole("dialog")).toBeVisible();

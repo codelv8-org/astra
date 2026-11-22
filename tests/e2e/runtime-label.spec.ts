@@ -43,7 +43,7 @@ test("persisted Claude IPC fixture shows the actual runtime provider", async ({
       },
     };
   }, agents);
-  await page.goto("/?view=console");
+  await page.goto("/?view=console&page=monitor");
   await page
     .getByRole("combobox", { name: /^Execution/ })
     .selectOption("claude-fixture");

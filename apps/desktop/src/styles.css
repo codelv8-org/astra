@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "../../../packages/ui/src/astra-glass.css";
+@import "../../../packages/ui/src/guildhall.css";
 
 /* ================= Console: glass dock + bento ================= */
 .console {
@@ -33,33 +34,17 @@
   flex: none;
 }
 .dock-nav {
-  display: flex;
-  gap: 2px;
-  padding: 3px;
-  border-radius: var(--r-pill);
-  background: var(--well);
-  box-shadow: inset 0 0 0 1px var(--hair);
-}
-.dock-nav a {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 13px;
-  border-radius: var(--r-pill);
-  color: var(--ink-2);
-  font-size: var(--t-sm);
-  font-weight: 600;
-  transition:
-    background 0.18s var(--ease),
-    color 0.18s var(--ease);
-}
-.dock-nav a:hover {
-  color: var(--ink);
-  background: var(--glass);
+  flex-wrap: wrap;
 }
 .dock-nav a span {
   color: var(--ink-3);
   font-size: var(--t-xs);
+}
+.console .dock-nav a[aria-current="page"],
+.home .home-nav a[aria-current="page"] {
+  color: var(--ink);
+  background: var(--tile-solid);
+  box-shadow: inset 0 0 0 1px var(--hair-2);
 }
 .core-chip {
   margin-left: auto;
@@ -74,7 +59,7 @@
 .bento {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: 14px;
+  gap: clamp(12px, 1.4vw, 20px);
   max-width: 1480px;
   margin: 0 auto;
   align-items: stretch;
@@ -147,65 +132,6 @@
 }
 .pulse-grid [data-tone="idle"] dd {
   color: var(--ink-2);
-}
-
-/* ---- Crew ---- */
-.crew-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8px;
-}
-.crew-card {
-  display: grid;
-  grid-template-rows: auto auto 1fr auto;
-  gap: 8px;
-  padding: 12px;
-  min-width: 0;
-  box-shadow:
-    inset 0 0 0 1px var(--hair),
-    inset 0 2px 0 color-mix(in srgb, var(--agent) 70%, transparent);
-}
-.crew-card img {
-  width: 40px;
-  height: auto;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--agent) 22%, transparent);
-}
-.crew-text {
-  min-width: 0;
-}
-.crew-text h3 {
-  letter-spacing: 0.02em;
-}
-.crew-role,
-.crew-live span:last-child {
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-.crew-role {
-  color: var(--ink-3);
-  font-size: var(--t-xs);
-  line-height: 1.4;
-}
-.crew-live {
-  display: flex;
-  align-items: flex-start;
-  gap: 7px;
-  color: var(--ink-2);
-  font-size: var(--t-sm);
-  line-height: 1.4;
-}
-.crew-live .dot {
-  margin-top: 5px;
-}
-.crew-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  flex-wrap: wrap;
 }
 
 /* ---- Rows (projects, runtimes, sharing) ---- */
@@ -441,6 +367,7 @@
 }
 .writing {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   padding: 14px;
 }
@@ -452,6 +379,56 @@
   cursor: pointer;
   font-family: var(--mono);
   font-size: var(--t-sm);
+  overflow-wrap: anywhere;
+}
+.patch-file {
+  padding: 8px;
+  border: 1px solid var(--hair);
+  border-radius: var(--r-inner);
+}
+.patch-digest {
+  overflow-wrap: anywhere;
+}
+.patch-lines,
+.patch-contents {
+  margin-top: 8px;
+}
+.patch-lines {
+  overflow: hidden;
+}
+.patch-lines table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font: 12px/1.55 var(--mono);
+}
+.patch-lines :is(th, td) {
+  padding: 3px 6px;
+  text-align: start;
+  vertical-align: top;
+}
+.patch-lines :is(th, td):nth-child(-n + 2) {
+  width: 5ch;
+  text-align: end;
+  color: var(--ink-2);
+}
+.patch-lines code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.patch-sign {
+  display: inline-block;
+  width: 2ch;
+}
+.patch-ending {
+  margin-inline-start: 1ch;
+  color: var(--ink-2);
+}
+.patch-lines [data-change="add"] {
+  background: color-mix(in srgb, var(--ok) 15%, transparent);
+}
+.patch-lines [data-change="remove"] {
+  background: color-mix(in srgb, var(--bad) 15%, transparent);
 }
 
 /* ---- Remote ---- */
@@ -479,6 +456,22 @@
 }
 .monitor-controls {
   align-items: center;
+}
+.monitor-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.monitor-tabs [aria-selected="true"] {
+  border-color: var(--accent);
+  background: var(--well);
+}
+.execution-result {
+  min-width: 0;
+}
+.execution-result .task-prompt {
+  max-height: min(55vh, 600px);
 }
 .run-meta {
   display: flex;
@@ -546,9 +539,6 @@
 
 /* ================= Responsive ================= */
 @media (max-width: 1240px) {
-  .crew-grid {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  }
   .span-4 {
     grid-column: span 6;
   }
@@ -565,7 +555,10 @@
     grid-column: span 6;
   }
 }
-@media (max-width: 980px) {
+@media (max-width: 1240px) {
+  html:has(.console) {
+    --scroll-inset: 150px;
+  }
   .dock {
     flex-wrap: wrap;
     border-radius: 24px;
@@ -573,7 +566,7 @@
   .dock-nav {
     order: 3;
     flex-basis: 100%;
-    overflow-x: auto;
+    width: 100%;
   }
   .core-chip {
     margin-left: auto;
@@ -593,6 +586,9 @@
   }
 }
 @media (max-width: 560px) {
+  html:has(.console) {
+    --scroll-inset: 12px;
+  }
   .console {
     padding: 10px 12px 24px;
   }
@@ -615,6 +611,9 @@
   .dock-actions {
     margin-left: auto;
   }
+  .dock-nav a {
+    padding-inline: 9px;
+  }
   .bento {
     gap: 10px;
   }
@@ -630,9 +629,6 @@
   }
   .pulse-grid dd {
     font-size: 24px;
-  }
-  .crew-grid {
-    grid-template-columns: 1fr 1fr;
   }
   .inline-select {
     flex-wrap: wrap;
@@ -658,4 +654,100 @@
   .agent-detail img {
     width: 110px;
   }
+}
+
+/* source folders: ฟอร์มสร้างโปรเจกต์และ ProjectDetail */
+.folder-field {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.folder-field legend {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.folder-list {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+.folder-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  width: 100%;
+}
+.folder-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  padding: 8px 10px;
+  border-radius: var(--r-sm, 8px);
+  background: var(--well);
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+.folder-list li.primary-folder {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.folder-list code {
+  flex: 1 1 220px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.folder-list .chip.ok {
+  color: var(--ok);
+}
+.folder-list .chip.bad {
+  color: var(--bad);
+}
+.folder-warning {
+  flex-basis: 100%;
+  color: var(--ink-2);
+  font-size: var(--t-xs);
+}
+.folder-actions {
+  display: inline-flex;
+  gap: 10px;
+  margin-left: auto;
+}
+.project-folders {
+  display: grid;
+  gap: 8px;
+}
+
+/* พื้นที่จัดเก็บและหน้ากู้คืน */
+.storage-panel {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+.storage-location {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.storage-location code {
+  overflow-wrap: anywhere;
+}
+.storage-actions,
+.storage-done {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.storage-recovery {
+  max-width: 640px;
+  margin: 12vh auto;
+  padding: 0 16px;
+  display: grid;
+  gap: 14px;
 }

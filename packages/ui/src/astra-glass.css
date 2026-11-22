@@ -20,25 +20,30 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
   /* field = ท้องฟ้ากลางคืน, ink = ตัวอักษร */
-  --field: #0b1730;
-  --field-2: #102144;
-  --ink: #eef3ff;
-  --ink-2: rgb(238 243 255 / 0.7);
-  --ink-3: rgb(238 243 255 / 0.48);
-  --accent: #6f9bff;
+  --field: #100e24;
+  --field-2: #1c173a;
+  --ink: #f8f6ff;
+  --ink-2: #d5cde8;
+  --ink-3: #b6adc9;
+  --accent: #bbc1ff;
   --accent-ink: #fff;
-  --accent-fill: #3d6ae0;
+  --accent-fill: #4e4bc0;
   /* material ของเนื้อหา */
-  --tile: rgb(17 31 60 / 0.74);
-  --tile-solid: #13234a;
-  --well: rgb(5 12 28 / 0.42);
-  --hair: rgb(255 255 255 / 0.09);
-  --hair-2: rgb(255 255 255 / 0.16);
+  --tile: rgb(30 24 54 / 0.9);
+  --tile-solid: #201a37;
+  --well: rgb(10 8 27 / 0.42);
+  --hair: rgb(251 242 255 / 0.13);
+  --hair-2: rgb(251 242 255 / 0.22);
   /* กระจก */
-  --glass: rgb(160 190 255 / 0.1);
-  --glass-hi: rgb(255 255 255 / 0.16);
-  --glass-rim: rgb(255 255 255 / 0.5);
-  --glass-rim-2: rgb(255 255 255 / 0.14);
+  --glass: rgb(187 168 246 / 0.12);
+  --glass-hi: rgb(239 222 255 / 0.16);
+  --glass-rim: rgb(251 240 255 / 0.57);
+  --glass-rim-2: rgb(172 190 255 / 0.25);
+  --glass-surface: rgb(31 24 54 / 0.83);
+  --glass-caustic: rgb(195 166 255 / 0.16);
+  --glass-refract: rgb(113 164 255 / 0.21);
+  --ambient-warm: #ae4c91;
+  --ambient-cool: #5d54c7;
   --glass-shadow: 0 18px 40px -18px rgb(0 0 0 / 0.65);
   --tile-shadow: 0 24px 48px -32px rgb(0 0 0 / 0.8);
   /* สถานะ */
@@ -52,28 +57,33 @@
 }
 :root[data-theme="light"] {
   color-scheme: light;
-  --field: #e6ecf6;
-  --field-2: #f4f7fc;
-  --ink: #111b30;
-  --ink-2: #46546d;
-  --ink-3: #6b7890;
-  --accent: #2b57cf;
+  --field: #e8e7fa;
+  --field-2: #f8f1fb;
+  --ink: #211936;
+  --ink-2: #493e60;
+  --ink-3: #594e70;
+  --accent: #4636a1;
   --accent-ink: #fff;
-  --accent-fill: #2f5bd3;
-  --tile: rgb(255 255 255 / 0.74);
-  --tile-solid: #fff;
-  --well: rgb(214 224 240 / 0.55);
+  --accent-fill: #4c39ac;
+  --tile: rgb(253 251 255 / 0.89);
+  --tile-solid: #fcfaff;
+  --well: rgb(225 218 244 / 0.53);
   --hair: rgb(17 27 48 / 0.08);
   --hair-2: rgb(17 27 48 / 0.15);
-  --glass: rgb(255 255 255 / 0.42);
-  --glass-hi: rgb(255 255 255 / 0.7);
-  --glass-rim: rgb(255 255 255 / 0.95);
-  --glass-rim-2: rgb(17 27 48 / 0.08);
+  --glass: rgb(255 255 255 / 0.55);
+  --glass-hi: rgb(255 255 255 / 0.79);
+  --glass-rim: rgb(255 255 255 / 0.98);
+  --glass-rim-2: rgb(104 77 153 / 0.29);
+  --glass-surface: rgb(251 247 255 / 0.83);
+  --glass-caustic: rgb(255 240 252 / 0.8);
+  --glass-refract: rgb(170 191 247 / 0.3);
+  --ambient-warm: #e29bce;
+  --ambient-cool: #a19be9;
   --glass-shadow: 0 16px 36px -20px rgb(30 50 90 / 0.45);
   --tile-shadow: 0 24px 48px -36px rgb(30 50 90 / 0.5);
   --ok: #10956a;
   --run: #2b57cf;
-  --wait: #b8740c;
+  --wait: #8b5300;
   --bad: #c9354b;
   --idle: #6b7890;
   --bad-ink: #a2223a;
@@ -103,10 +113,10 @@
   --mono: "Cascadia Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
   /* ระดับตัวอักษร */
   --t-xs: 11.5px;
-  --t-sm: 12.5px;
+  --t-sm: 13px;
   --t-md: 14px;
   --t-lg: 17px;
-  --t-xl: 22px;
+  --t-xl: clamp(24px, 2.3vw, 34px);
   /* Lucian tabs อ่านค่าจากชุดนี้ */
   --ux-page: var(--field);
   --ux-surface: var(--well);
@@ -128,12 +138,13 @@
 }
 html {
   scroll-behavior: smooth;
-  scroll-padding-top: 88px;
+  scroll-padding-top: var(--scroll-inset, 92px);
 }
 body {
   margin: 0;
   min-height: 100vh;
   background: var(--field);
+  isolation: isolate;
   color: var(--ink);
   font-family: var(--font);
   font-size: var(--t-md);
@@ -175,14 +186,10 @@ body::before {
       color-mix(in srgb, var(--c-scout) calc(var(--glow-scout) * 100%), transparent),
       transparent 70%
     ),
-    linear-gradient(180deg, var(--field-2), var(--field));
+    radial-gradient(ellipse at 78% 6%, var(--ambient-warm), transparent 43%),
+    radial-gradient(ellipse at 28% 55%, var(--ambient-cool), transparent 58%),
+    linear-gradient(148deg, var(--field-2), var(--field) 68%);
   transition: background 1.2s var(--ease);
-  animation: astra-drift 48s ease-in-out infinite alternate;
-}
-@keyframes astra-drift {
-  to {
-    transform: translate3d(-2.5vmax, 1.5vmax, 0) scale(1.04);
-  }
 }
 
 h1,
@@ -235,6 +242,14 @@ textarea {
 .muted {
   color: var(--ink-2);
 }
+.workspace-heading {
+  display: grid;
+  gap: 4px;
+  padding: 10px 4px 3px;
+}
+.workspace-heading p {
+  max-width: 60ch;
+}
 .sr-only {
   position: absolute;
   width: 1px;
@@ -248,37 +263,78 @@ textarea {
 .glass {
   position: relative;
   isolation: isolate;
-  background:
-    linear-gradient(180deg, var(--glass-hi), transparent 46%),
-    var(--glass);
-  -webkit-backdrop-filter: blur(24px) saturate(185%);
-  backdrop-filter: blur(24px) saturate(185%);
+  background: var(--tile-solid);
   box-shadow:
     inset 0 1px 0 var(--glass-rim),
     inset 0 -1px 0 var(--glass-rim-2),
     var(--glass-shadow);
 }
-/* ขอบสะท้อนแสง (specular rim) เข้มที่มุมบนซ้ายและล่างขวา */
+/* ขอบกระจกและแสงสะท้อนอิง Liquid Glass Studio โดยใช้ชั้น CSS */
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass {
+    background:
+      radial-gradient(ellipse at 5% 0%, var(--glass-caustic), transparent 50%),
+      radial-gradient(ellipse at 100% 100%, var(--glass-refract), transparent 54%),
+      linear-gradient(172deg, var(--glass-hi), transparent 48%),
+      var(--glass-surface);
+    -webkit-backdrop-filter: blur(20px) saturate(155%);
+    backdrop-filter: blur(20px) saturate(155%);
+  }
+}
 .glass::after {
   content: "";
   position: absolute;
   inset: 0;
   z-index: -1;
+  border: 1px solid transparent;
   border-radius: inherit;
-  padding: 1px;
   background: linear-gradient(
     135deg,
     var(--glass-rim),
-    transparent 32%,
-    transparent 64%,
-    color-mix(in srgb, var(--glass-rim) 55%, transparent)
-  );
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
+    var(--glass-rim-2) 23%,
+    transparent 45%,
+    var(--glass-rim-2) 72%,
+    var(--glass-rim)
+  ) border-box;
+  mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
   mask-composite: exclude;
   pointer-events: none;
+}
+
+/* แถบทางลัดและเมนูย่อย */
+.glass-nav {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+.glass-nav a,
+.glass-nav button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 5px 13px;
+  border-radius: var(--r-pill);
+  background: transparent;
+  box-shadow: none;
+  color: var(--ink-2);
+  font-size: var(--t-sm);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.glass-nav a:hover,
+.glass-nav button:hover:not(:disabled) {
+  color: var(--ink);
+  background:
+    linear-gradient(180deg, var(--glass-hi), transparent),
+    var(--glass);
+  box-shadow: inset 0 0 0 1px var(--hair-2);
 }
 
 /* ---------- material ของเนื้อหา ---------- */
@@ -288,8 +344,6 @@ textarea {
   padding: 18px;
   border-radius: var(--r-tile);
   background: var(--tile);
-  -webkit-backdrop-filter: blur(14px) saturate(140%);
-  backdrop-filter: blur(14px) saturate(140%);
   box-shadow:
     inset 0 1px 0 var(--hair-2),
     inset 0 0 0 1px var(--hair),
@@ -358,7 +412,7 @@ button:disabled {
 }
 button.primary {
   background:
-    linear-gradient(180deg, rgb(255 255 255 / 0.22), transparent 55%),
+    linear-gradient(180deg, rgb(255 255 255 / 0.10), transparent 55%),
     var(--accent-fill);
   color: var(--accent-ink);
   box-shadow:
@@ -368,7 +422,7 @@ button.primary {
 }
 button.primary:hover:not(:disabled) {
   background:
-    linear-gradient(180deg, rgb(255 255 255 / 0.3), transparent 55%),
+    linear-gradient(180deg, rgb(255 255 255 / 0.16), transparent 55%),
     var(--accent-fill);
 }
 button.danger {
@@ -384,7 +438,8 @@ button.quiet:hover:not(:disabled) {
   color: var(--ink);
 }
 button.icon {
-  width: 34px;
+  width: 40px;
+  min-height: 40px;
   padding: 0;
   font-size: 18px;
   line-height: 1;
@@ -580,8 +635,8 @@ dialog::backdrop {
   overflow-wrap: anywhere;
 }
 .modal-header button {
-  width: 32px;
-  min-height: 32px;
+  width: 40px;
+  min-height: 40px;
   padding: 0;
   font-size: 18px;
 }
@@ -593,6 +648,18 @@ dialog::backdrop {
 }
 
 /* ---------- การเข้าถึง ---------- */
+@media (pointer: coarse) {
+  button:not(.link),
+  .glass-nav a,
+  .modal-header button {
+    min-height: 44px;
+  }
+  button.icon,
+  .modal-header button {
+    width: 44px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -622,7 +689,8 @@ dialog::backdrop {
   }
 }
 @media (prefers-contrast: more) {
-  :root {
+  :root,
+  :root[data-theme] {
     --hair: rgb(127 140 165 / 0.6);
     --hair-2: rgb(127 140 165 / 0.85);
   }

@@ -4,9 +4,12 @@ import {
   CSS2DObject,
   CSS2DRenderer,
 } from "three/examples/jsm/renderers/CSS2DRenderer.js";
+import { ROOM } from "./room";
+import { worldById, type World, type WorldId } from "./worlds";
 
 /**
- * ฉาก 3D ของ Home: ออฟฟิศ CrewBots แบบ procedural (ไม่มีไฟล์โมเดลภายนอก)
+ * ฉาก Home: ออฟฟิศ CrewBots มุมมอง isometric แบบ pixel (procedural ทั้งหมด ไม่มีไฟล์โมเดล/ภาพภายนอก)
+ * วาดที่ความละเอียดต่ำแล้วขยายแบบ nearest-neighbor ให้เป็นพิกเซล ป้ายชื่อเป็น DOM จึงคมชัด
  * สถานะของหุ่นมาจาก Core snapshot เท่านั้น ฉากนี้แค่ "แสดง" ไม่ได้จำลองผลงานขึ้นเอง
  */
 export type SceneStatus = "idle" | "working" | "waiting" | "error" | "offline";
@@ -16,12 +19,21 @@ export interface SceneAgent {
   characterKey: string;
   status: SceneStatus;
   activity: string;
+  runtime?: string;
 }
 export interface SceneOptions {
   theme: "dark" | "light";
   reducedMotion: boolean;
+  world?: WorldId;
   onSelect?: (agentId: string) => void;
 }
+export interface SceneMap {
+  bots: { id: string; x: number; z: number; status: SceneStatus }[];
+  /** มุมทั้งสี่ของภาพที่กล้องเห็นบนพื้น (x, z) */
+  view: [number, number][];
+}
+
+export { ROOM };
 
 const palette: Record<string, [string, string]> = {
   astra: ["#4169E1", "#F2C75C"],
@@ -31,46 +43,52 @@ const palette: Record<string, [string, string]> = {
   scout: ["#879B4A", "#D5E89B"],
 };
 const statusColor: Record<SceneStatus, string> = {
-  idle: "#7f8ba3",
-  working: "#47d6a0",
-  waiting: "#f2b84b",
-  error: "#ff6b7f",
-  offline: "#4a5266",
+  idle: "#8f8982",
+  working: "#22c55e",
+  waiting: "#ebae42",
+  error: "#ef4444",
+  offline: "#57534e",
 };
+const runtimeMonogram: Record<string, string> = {
+  codex: "CX",
+  claude: "CL",
+  antigravity: "AG",
+  mock: "MK",
+};
+/** แสงตามธีมแอป (มืด = กลางคืน, สว่าง = กลางวัน) สีของห้องมาจาก world */
 const themes = {
   dark: {
-    bg: "#0b1730",
-    floor: "#122244",
-    grid: "#2a4170",
-    desk: "#1c2e55",
-    wall: "#14264a",
+    hemi: ["#ffe2bd", "#2a1d14", 1.05],
+    sun: ["#b9c6ff", 0.7],
+    lamp: 12,
+    screen: 1,
   },
   light: {
-    bg: "#e6ecf6",
-    floor: "#f6f8fc",
-    grid: "#c6d3e8",
-    desk: "#dce5f3",
-    wall: "#d0dbee",
+    hemi: ["#fff4e0", "#7a6650", 1.15],
+    sun: ["#fff1d6", 1.5],
+    lamp: 2,
+    screen: 0.6,
   },
-};
+} as const;
 
-/** โต๊ะประจำตำแหน่ง: ASTRA อยู่โต๊ะบัญชาการกลาง ที่เหลือเรียงเป็นวงโค้ง */
+/** โต๊ะประจำตำแหน่ง: ASTRA โต๊ะประชุมกลม ที่เหลือหันหน้าเข้าผนัง */
 const desks: Record<string, { x: number; z: number; face: number }> = {
-  astra: { x: 0, z: 1.55, face: Math.PI },
-  vector: { x: -4.1, z: -1.2, face: Math.PI * 0.62 },
-  mira: { x: -1.6, z: -3.4, face: Math.PI * 0.86 },
-  forge: { x: 1.6, z: -3.4, face: Math.PI * 1.14 },
-  scout: { x: 4.1, z: -1.2, face: Math.PI * 1.38 },
+  astra: { x: 0.8, z: 1.2, face: Math.PI },
+  vector: { x: -4.4, z: -3.7, face: 0 },
+  mira: { x: -1.4, z: -3.7, face: 0 },
+  forge: { x: 1.6, z: -3.7, face: 0 },
+  scout: { x: -5.9, z: 1.6, face: Math.PI / 2 },
 };
 const waypoints = [
-  new THREE.Vector3(-4.6, 0, 2.6),
-  new THREE.Vector3(4.6, 0, 2.6),
-  new THREE.Vector3(-2.4, 0, 3.6),
-  new THREE.Vector3(2.4, 0, 3.6),
-  new THREE.Vector3(-5.2, 0, 0.6),
-  new THREE.Vector3(5.2, 0, 0.6),
-  new THREE.Vector3(0, 0, -1.4),
-];
+  [3.6, 1.6],
+  [4.6, 3.4],
+  [-2.6, 3.4],
+  [-3.6, 0.2],
+  [2.4, 3.8],
+  [5.2, -1.6],
+  [-0.8, 3.9],
+  [3.4, -1.4],
+].map(([x, z]) => new THREE.Vector3(x, 0, z));
 
 interface Bot {
   data: SceneAgent;
@@ -79,9 +97,9 @@ interface Bot {
   head: THREE.Group;
   eyes: THREE.Mesh[];
   arms: THREE.Mesh[];
-  beacon: THREE.MeshStandardMaterial;
+  beacon: THREE.MeshLambertMaterial;
   ring: THREE.MeshBasicMaterial;
-  monitor: THREE.MeshStandardMaterial;
+  monitor: THREE.MeshLambertMaterial;
   label: HTMLDivElement;
   target: THREE.Vector3;
   facing: number;
@@ -108,103 +126,203 @@ function softwareRenderer() {
   }
 }
 
+const pixelTexture = (canvas: HTMLCanvasElement, repeat: [number, number]) => {
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.magFilter = THREE.NearestFilter;
+  texture.minFilter = THREE.NearestFilter;
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(...repeat);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+};
+
+/** พื้นแบบพิกเซลตาม world: ไม้กระดาน หรือแผ่นโลหะมีหมุด วาดด้วย canvas (ไม่มีไฟล์ภาพ) */
+function floorTexture({ floor }: World) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 64;
+  canvas.height = 64;
+  const ctx = canvas.getContext("2d")!;
+  const { tones, seam } = floor;
+  if (floor.kind === "plates") {
+    for (let row = 0; row < 4; row++)
+      for (let col = 0; col < 4; col++) {
+        ctx.fillStyle = tones[(row * 3 + col) % tones.length];
+        ctx.fillRect(col * 16, row * 16, 16, 16);
+        ctx.fillStyle = seam;
+        ctx.fillRect(col * 16, row * 16, 16, 1);
+        ctx.fillRect(col * 16, row * 16, 1, 16);
+        ctx.fillRect(col * 16 + 3, row * 16 + 3, 1, 1);
+        ctx.fillRect(col * 16 + 12, row * 16 + 12, 1, 1);
+      }
+  } else {
+    for (let row = 0; row < 8; row++) {
+      const offset = (row % 2) * 16;
+      for (let col = -1; col < 3; col++) {
+        ctx.fillStyle = tones[(row * 3 + col + 4) % tones.length];
+        ctx.fillRect(col * 32 + offset, row * 8, 32, 8);
+        ctx.fillStyle = seam;
+        ctx.fillRect(col * 32 + offset, row * 8, 1, 8);
+      }
+      ctx.fillStyle = seam;
+      ctx.fillRect(0, row * 8 + 7, 64, 1);
+    }
+  }
+  return pixelTexture(canvas, [7, 5]);
+}
+
+/** ท้องฟ้ามีดาวสำหรับหน้าต่างของสถานีอวกาศ */
+function starTexture() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 32;
+  canvas.height = 20;
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "#05070d";
+  ctx.fillRect(0, 0, 32, 20);
+  ctx.fillStyle = "#dfe8ff";
+  for (const [x, y] of [
+    [3, 4],
+    [11, 2],
+    [17, 9],
+    [26, 5],
+    [7, 14],
+    [22, 15],
+    [29, 12],
+    [14, 17],
+  ])
+    ctx.fillRect(x, y, 1, 1);
+  return pixelTexture(canvas, [1, 1]);
+}
+
+const lambert = (color: string, extra: THREE.MeshLambertMaterialParameters = {}) =>
+  new THREE.MeshLambertMaterial({ color, flatShading: true, ...extra });
+
 export class OfficeScene {
+  static readonly defaultZoom = 1.2;
   private renderer: THREE.WebGLRenderer;
   private labels: CSS2DRenderer;
   private scene = new THREE.Scene();
-  private camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+  private camera = new THREE.OrthographicCamera(-8, 8, 6, -6, 0.1, 200);
   private controls: OrbitControls;
   private clock = new THREE.Clock();
   private bots = new Map<string, Bot>();
-  private floorMat = new THREE.MeshStandardMaterial({ roughness: 0.92 });
-  private deskMat = new THREE.MeshStandardMaterial({
-    roughness: 0.6,
-    metalness: 0.15,
-  });
-  private wallMat = new THREE.MeshStandardMaterial({ roughness: 0.9 });
-  private grid: THREE.GridHelper | null = null;
+  private wallMat = lambert("#3a2c24");
+  private trimMat = lambert("#241a15");
+  private windowMat = new THREE.MeshBasicMaterial({ color: "#1b2840" });
+  private floorMat = new THREE.MeshLambertMaterial();
+  private rugMat = lambert("#6b2f2a");
+  private rugInnerMat = lambert("#7d3b30");
+  private leavesMat = lambert("#3f7f4f");
+  private themeName: "dark" | "light" = "dark";
+  private world: World = worldById("office");
+  private woodMat = lambert("#8a5a34");
+  private darkWoodMat = lambert("#5a3820");
+  private hemi = new THREE.HemisphereLight("#ffd9a8", "#1a120d", 0.5);
+  private sun = new THREE.DirectionalLight("#9fb4ff", 0.35);
+  private lamps: THREE.PointLight[] = [];
+  private screens: THREE.MeshLambertMaterial[] = [];
   private holo: THREE.Mesh;
-  private holoMat: THREE.MeshBasicMaterial;
   private beams = new THREE.Group();
   private frame = 0;
   private observer: ResizeObserver;
   private raycaster = new THREE.Raycaster();
   private pointer = new THREE.Vector2();
+  private floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   private disposed = false;
   private options: SceneOptions;
   private lowPower: boolean;
+  private pixelScale: number;
   private minFrame: number;
   private sinceRender = 0;
+  private paused = false;
+  private speed = 1;
+  private focused: string | null = null;
+  private panGoal: THREE.Vector3 | null = null;
+  private screenLevel = 1;
+  private readonly home = new THREE.Vector3(0, 0.6, -0.2);
+  private readonly isoOffset = new THREE.Vector3(1, 0.82, 1)
+    .normalize()
+    .multiplyScalar(40);
 
   constructor(
     private host: HTMLElement,
     options: SceneOptions,
   ) {
     this.options = options;
-    // GPU แบบ software (SwiftShader/WARP/llvmpipe เช่นเครื่อง CI หรือ VM) วาดช้ามาก
-    // จึงปิดเงา/antialias และจำกัดเฟรมเพื่อไม่ให้ main thread ค้าง
+    // GPU แบบ software (เครื่อง CI/VM) วาดช้า จึงปิดเงาและจำกัดเฟรม
     this.lowPower = softwareRenderer();
     this.minFrame = this.lowPower ? 1 / 12 : 0;
+    this.pixelScale = this.lowPower ? 4 : 3;
     host.dataset.quality = this.lowPower ? "low" : "high";
     this.renderer = new THREE.WebGLRenderer({
-      antialias: !this.lowPower,
+      antialias: false,
       alpha: false,
       powerPreference: this.lowPower ? "low-power" : "high-performance",
     });
-    this.renderer.setPixelRatio(
-      this.lowPower ? 1 : Math.min(window.devicePixelRatio, 2),
-    );
+    // วาดที่ 1/3 ของขนาดจอแล้วให้ CSS ขยายแบบ pixelated
+    this.renderer.setPixelRatio(1 / this.pixelScale);
     this.renderer.shadowMap.enabled = !this.lowPower;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.BasicShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.domElement.setAttribute("aria-hidden", "true");
+    this.renderer.domElement.classList.add("pixel-canvas");
     host.appendChild(this.renderer.domElement);
 
     this.labels = new CSS2DRenderer();
     this.labels.domElement.className = "scene-labels";
     host.appendChild(this.labels.domElement);
 
-    this.camera.position.set(0, 7.2, 10.8);
+    this.camera.position.copy(this.home).add(this.isoOffset);
+    this.camera.lookAt(this.home);
+    this.camera.zoom = OfficeScene.defaultZoom;
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    this.controls.target.set(0, 0.6, -0.6);
-    this.controls.enablePan = false;
+    this.controls.target.copy(this.home);
+    this.controls.enableRotate = false;
+    this.controls.enablePan = true;
+    this.controls.screenSpacePanning = true;
     this.controls.enableDamping = true;
-    this.controls.minDistance = 7;
-    this.controls.maxDistance = 17;
-    this.controls.minPolarAngle = 0.45;
-    this.controls.maxPolarAngle = 1.22;
-    this.controls.autoRotateSpeed = 0.35;
+    this.controls.minZoom = 0.75;
+    this.controls.maxZoom = 3;
+    this.controls.mouseButtons = {
+      LEFT: THREE.MOUSE.PAN,
+      MIDDLE: THREE.MOUSE.DOLLY,
+      RIGHT: THREE.MOUSE.PAN,
+    };
+    this.controls.touches = {
+      ONE: THREE.TOUCH.PAN,
+      TWO: THREE.TOUCH.DOLLY_PAN,
+    };
 
-    this.scene.add(new THREE.HemisphereLight("#cfe0ff", "#1a1f33", 1.1));
-    const sun = new THREE.DirectionalLight("#ffffff", 1.6);
-    sun.position.set(5, 10, 6);
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(1024, 1024);
-    sun.shadow.camera.left = -9;
-    sun.shadow.camera.right = 9;
-    sun.shadow.camera.top = 9;
-    sun.shadow.camera.bottom = -9;
-    sun.shadow.radius = 4;
-    this.scene.add(sun);
-    const rim = new THREE.PointLight("#4169E1", 18, 14);
-    rim.position.set(0, 3, 1.5);
-    this.scene.add(rim);
+    this.sun.position.set(-6, 12, 4);
+    this.sun.castShadow = true;
+    this.sun.shadow.mapSize.set(512, 512);
+    Object.assign(this.sun.shadow.camera, {
+      left: -9,
+      right: 9,
+      top: 9,
+      bottom: -9,
+    });
+    this.scene.add(this.hemi, this.sun);
+    for (const [x, z] of [
+      [-2.9, -3.2],
+      [1.6, -3.2],
+      [0.8, 1.2],
+      [-5.4, 1.6],
+    ]) {
+      const lamp = new THREE.PointLight("#ffb35c", 12, 7, 1.4);
+      lamp.position.set(x, 1.9, z);
+      this.lamps.push(lamp);
+      this.scene.add(lamp);
+    }
 
     this.buildOffice();
-    this.holoMat = new THREE.MeshBasicMaterial({
-      color: "#7DB4FF",
-      wireframe: true,
-      transparent: true,
-      opacity: 0.75,
-    });
     this.holo = new THREE.Mesh(
-      new THREE.IcosahedronGeometry(0.42, 1),
-      this.holoMat,
+      new THREE.OctahedronGeometry(0.22, 0),
+      new THREE.MeshBasicMaterial({ color: "#ebae42" }),
     );
-    this.holo.position.set(desks.astra.x, 1.2, desks.astra.z);
-    this.holo.scale.setScalar(0.75);
+    this.holo.position.set(desks.astra.x, 1.35, desks.astra.z);
     this.scene.add(this.holo, this.beams);
 
+    this.world = worldById(options.world ?? "office");
     this.setTheme(options.theme);
     this.setReducedMotion(options.reducedMotion);
     this.renderer.domElement.addEventListener("click", this.onClick);
@@ -217,23 +335,147 @@ export class OfficeScene {
   }
 
   setTheme(theme: "dark" | "light") {
-    const t = themes[theme];
-    this.scene.background = new THREE.Color(t.bg);
-    this.scene.fog = new THREE.Fog(t.bg, 16, 30);
-    this.floorMat.color.set(t.floor);
-    this.deskMat.color.set(t.desk);
-    this.wallMat.color.set(t.wall);
-    if (this.grid) this.scene.remove(this.grid);
-    this.grid = new THREE.GridHelper(15, 30, t.grid, t.grid);
-    this.grid.position.y = 0.011;
-    (this.grid.material as THREE.Material).transparent = true;
-    (this.grid.material as THREE.Material).opacity = 0.55;
-    this.scene.add(this.grid);
+    this.themeName = theme;
+    this.applyLook();
+  }
+
+  /** เปลี่ยนโลกของฉาก: สี พื้น และแสงเท่านั้น ผังโต๊ะและหุ่นเหมือนเดิม */
+  setWorld(id: WorldId) {
+    this.world = worldById(id);
+    this.applyLook();
+  }
+
+  private applyLook() {
+    const t = themes[this.themeName];
+    const w = this.world;
+    const day = this.themeName === "light" ? 1 : 0;
+    this.scene.background = new THREE.Color(w.background[day]);
+    this.wallMat.color.set(w.wall[day]);
+    this.trimMat.color.set(w.trim);
+    this.windowMat.map?.dispose();
+    this.windowMat.map = w.stars ? starTexture() : null;
+    this.windowMat.color.set(w.stars ? "#ffffff" : w.window[day]);
+    this.windowMat.needsUpdate = true;
+    this.floorMat.map?.dispose();
+    this.floorMat.map = floorTexture(w);
+    this.floorMat.needsUpdate = true;
+    this.rugMat.color.set(w.rug[0]);
+    this.rugInnerMat.color.set(w.rug[1]);
+    this.leavesMat.color.set(w.leaves);
+    this.hemi.color.set(t.hemi[0]);
+    this.hemi.groundColor.set(t.hemi[1]);
+    this.hemi.intensity = t.hemi[2];
+    this.sun.color.set(t.sun[0]);
+    this.sun.intensity = t.sun[1];
+    this.lamps.forEach((lamp) => {
+      lamp.color.set(w.lamp);
+      lamp.intensity = t.lamp * w.lampBoost;
+    });
+    this.screenLevel = t.screen;
+    this.refreshScreens();
+  }
+
+  /**
+   * ภาพนิ่งหนึ่งเฟรมของโลกที่เลือก สำหรับการ์ดในหน้า Themes
+   * สร้างฉากชั่วคราวนอกจอ วาดครั้งเดียว แล้วคืน WebGL context ทันที
+   */
+  static preview(
+    world: WorldId,
+    theme: "dark" | "light",
+    agents: SceneAgent[],
+    width = 480,
+    height = 300,
+  ) {
+    const host = document.createElement("div");
+    Object.assign(host.style, {
+      position: "fixed",
+      left: "-10000px",
+      top: "0",
+      width: `${width}px`,
+      height: `${height}px`,
+    });
+    document.body.appendChild(host);
+    const scene = new OfficeScene(host, { theme, reducedMotion: true, world });
+    try {
+      scene.setAgents(agents);
+      scene.resize();
+      scene.renderer.render(scene.scene, scene.camera);
+      // คัดลอกเป็น canvas 2D แทน data URL: CSP ของ Tauri อนุญาต img-src เฉพาะ 'self'/asset
+      const source = scene.renderer.domElement;
+      const copy = document.createElement("canvas");
+      copy.width = source.width;
+      copy.height = source.height;
+      copy.getContext("2d")?.drawImage(source, 0, 0);
+      return copy;
+    } finally {
+      scene.dispose();
+      host.remove();
+    }
   }
 
   setReducedMotion(reduced: boolean) {
     this.options.reducedMotion = reduced;
-    this.controls.autoRotate = !reduced;
+  }
+
+  /** หยุดการเคลื่อนไหวของฉาก (ไม่กระทบงานจริงใน Core) */
+  setPaused(paused: boolean) {
+    this.paused = paused;
+  }
+
+  setSpeed(speed: number) {
+    this.speed = speed;
+  }
+
+  zoomBy(factor: number) {
+    this.camera.zoom = THREE.MathUtils.clamp(
+      this.camera.zoom * factor,
+      this.controls.minZoom,
+      this.controls.maxZoom,
+    );
+    this.camera.updateProjectionMatrix();
+  }
+
+  /** กลับไปมุมมองทั้งห้อง */
+  fit() {
+    this.camera.zoom = OfficeScene.defaultZoom;
+    this.camera.updateProjectionMatrix();
+    this.panGoal = this.home.clone();
+  }
+
+  /** เลื่อนกล้องไปยังจุดบนพื้น (x, z) */
+  panTo(x: number, z: number) {
+    this.panGoal = new THREE.Vector3(x, this.home.y, z);
+  }
+
+  setFocus(agentId: string | null) {
+    this.focused = agentId;
+    for (const [id, bot] of this.bots)
+      bot.label.dataset.focused = String(id === agentId);
+    const bot = agentId ? this.bots.get(agentId) : undefined;
+    if (bot) this.panTo(bot.root.position.x, bot.root.position.z);
+  }
+
+  mapState(): SceneMap {
+    const view: [number, number][] = [
+      [-1, 1],
+      [1, 1],
+      [1, -1],
+      [-1, -1],
+    ].map(([x, y]) => {
+      this.raycaster.setFromCamera(new THREE.Vector2(x, y), this.camera);
+      const hit = new THREE.Vector3();
+      this.raycaster.ray.intersectPlane(this.floorPlane, hit);
+      return [hit.x, hit.z];
+    });
+    return {
+      bots: [...this.bots.values()].map((bot) => ({
+        id: bot.data.id,
+        x: bot.root.position.x,
+        z: bot.root.position.z,
+        status: bot.data.status,
+      })),
+      view,
+    };
   }
 
   setAgents(agents: SceneAgent[]) {
@@ -243,13 +485,17 @@ export class OfficeScene {
       bot.data = agent;
       bot.label.querySelector("b")!.textContent = agent.name;
       bot.label.querySelector("small")!.textContent = agent.activity;
+      const badge = bot.label.querySelector<HTMLElement>(".runtime-badge")!;
+      badge.dataset.runtime = agent.runtime ?? "";
+      badge.textContent = runtimeMonogram[agent.runtime ?? ""] ?? "··";
       bot.label.dataset.status = agent.status;
+      bot.label.dataset.focused = String(agent.id === this.focused);
       bot.beacon.color.set(statusColor[agent.status]);
       bot.beacon.emissive.set(statusColor[agent.status]);
       bot.ring.color.set(statusColor[agent.status]);
       const atDesk = agent.status !== "idle";
-      bot.monitor.emissiveIntensity =
-        agent.status === "working" ? 1.4 : atDesk ? 0.55 : 0.12;
+      bot.monitor.userData.level =
+        agent.status === "working" ? 1.3 : atDesk ? 0.55 : 0.15;
       if (changed || atDesk) {
         const desk = desks[agent.characterKey] ?? desks.astra;
         if (atDesk || agent.characterKey === "astra") this.goToDesk(bot, desk);
@@ -261,6 +507,7 @@ export class OfficeScene {
         this.scene.remove(bot.root);
         this.bots.delete(id);
       }
+    this.refreshScreens();
     this.rebuildBeams();
   }
 
@@ -280,16 +527,25 @@ export class OfficeScene {
         | THREE.Material[]
         | undefined;
       if (Array.isArray(material)) material.forEach((item) => item.dispose());
-      else material?.dispose();
+      else {
+        (material as THREE.MeshLambertMaterial | undefined)?.map?.dispose();
+        material?.dispose();
+      }
     });
     this.renderer.dispose();
+    this.renderer.forceContextLoss();
     this.renderer.domElement.remove();
     this.labels.domElement.remove();
   }
 
+  private refreshScreens() {
+    for (const screen of this.screens)
+      screen.emissiveIntensity =
+        (screen.userData.level ?? 0.15) * this.screenLevel;
+  }
+
   private goToDesk(bot: Bot, desk: { x: number; z: number; face: number }) {
-    // ยืนหน้าโต๊ะ หันเข้าหาจอ (โต๊ะบัญชาการกลมของ ASTRA กว้างกว่า)
-    const gap = desk === desks.astra ? 1.55 : 0.95;
+    const gap = desk === desks.astra ? 1.55 : 0.9;
     bot.target.set(
       desk.x + Math.sin(desk.face) * gap,
       0,
@@ -300,84 +556,88 @@ export class OfficeScene {
     if (this.options.reducedMotion) bot.root.position.copy(bot.target);
   }
 
+  private box(
+    size: [number, number, number],
+    position: [number, number, number],
+    material: THREE.Material,
+    parent: THREE.Object3D = this.scene,
+  ) {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
+    mesh.position.set(...position);
+    mesh.castShadow = mesh.receiveShadow = !this.lowPower;
+    parent.add(mesh);
+    return mesh;
+  }
+
   private buildOffice() {
+    const { minX, maxX, minZ, maxZ } = ROOM;
+    const width = maxX - minX;
+    const depth = maxZ - minZ;
     const floor = new THREE.Mesh(
-      new THREE.CircleGeometry(8, 64),
+      new THREE.PlaneGeometry(width, depth),
       this.floorMat,
     );
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     this.scene.add(floor);
+    // ขอบพื้นให้ห้องดูเป็นก้อน isometric
+    this.box([width, 0.3, 0.2], [0, -0.15, maxZ + 0.1], this.trimMat);
+    this.box([0.2, 0.3, depth], [maxX + 0.1, -0.15, 0], this.trimMat);
 
-    const edge = new THREE.Mesh(
-      new THREE.TorusGeometry(8, 0.04, 8, 96),
-      new THREE.MeshBasicMaterial({
-        color: "#4169E1",
-        transparent: true,
-        opacity: 0.6,
-      }),
-    );
-    edge.rotation.x = Math.PI / 2;
-    edge.position.y = 0.02;
-    this.scene.add(edge);
-
-    // ผนังโค้งด้านหลังพร้อมแผงไฟ
-    const wall = new THREE.Mesh(
-      new THREE.CylinderGeometry(
-        7.6,
-        7.6,
-        2.6,
-        48,
-        1,
-        true,
-        Math.PI * 0.62,
-        Math.PI * 0.76,
-      ),
-      this.wallMat,
-    );
-    wall.position.y = 1.3;
-    wall.material.side = THREE.DoubleSide;
-    wall.receiveShadow = true;
-    this.scene.add(wall);
-    for (let i = 0; i < 7; i++) {
-      const angle = Math.PI * 0.68 + i * Math.PI * 0.107;
-      const panel = new THREE.Mesh(
-        new THREE.PlaneGeometry(0.9, 0.5),
-        new THREE.MeshBasicMaterial({
-          color: i % 2 ? "#36B7B0" : "#4169E1",
-          transparent: true,
-          opacity: 0.35,
-        }),
+    // ผนังหลังและผนังซ้าย พร้อมบัวผนัง
+    this.box([width, 2.8, 0.2], [0, 1.4, minZ - 0.1], this.wallMat);
+    this.box([0.2, 2.8, depth], [minX - 0.1, 1.4, 0], this.wallMat);
+    this.box([width, 0.16, 0.24], [0, 0.08, minZ], this.trimMat);
+    this.box([0.24, 0.16, depth], [minX, 0.08, 0], this.trimMat);
+    for (const x of [-4.4, -1.4, 1.6]) {
+      this.box([1.6, 1, 0.04], [x, 1.85, minZ + 0.02], this.trimMat);
+      const pane = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.4, 0.82),
+        this.windowMat,
       );
-      panel.position.set(Math.sin(angle) * 7.5, 1.75, Math.cos(angle) * 7.5);
-      panel.lookAt(0, 1.75, 0);
-      this.scene.add(panel);
+      pane.position.set(x, 1.85, minZ + 0.05);
+      this.scene.add(pane);
     }
+
+    // พรมใต้โต๊ะประชุม
+    const rug = new THREE.Mesh(
+      new THREE.PlaneGeometry(4.4, 3.4),
+      this.rugMat,
+    );
+    rug.rotation.x = -Math.PI / 2;
+    rug.position.set(desks.astra.x, 0.01, desks.astra.z);
+    rug.receiveShadow = true;
+    const rugInner = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.8, 2.8),
+      this.rugInnerMat,
+    );
+    rugInner.rotation.x = -Math.PI / 2;
+    rugInner.position.set(desks.astra.x, 0.015, desks.astra.z);
+    this.scene.add(rug, rugInner);
 
     for (const [key, desk] of Object.entries(desks)) this.buildDesk(key, desk);
 
-    // ต้นไม้และจุดพักสำหรับหุ่นที่ว่าง
+    // ชั้นหนังสือ ตู้ server กระดาน และต้นไม้
+    this.buildShelf(-6.7, -2.4, Math.PI / 2);
+    this.buildShelf(5.6, -4.7, 0);
+    const rack = this.box([0.9, 2, 0.8], [4.1, 1, -4.4], lambert("#1c1d22"));
+    const led = new THREE.MeshBasicMaterial({ color: "#3ddc84" });
+    for (let i = 0; i < 6; i++)
+      this.box(
+        [0.06, 0.04, 0.02],
+        [-0.3 + (i % 3) * 0.12, -0.6 + Math.floor(i / 3) * 0.5, 0.41],
+        led,
+        rack,
+      );
+    this.box([1.5, 0.95, 0.05], [3.4, 1.6, -4.85], lambert("#ecebe7"));
     for (const [x, z] of [
-      [-5.6, 2.2],
-      [5.6, 2.2],
-    ]) {
-      const pot = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.28, 0.22, 0.5, 20),
-        this.deskMat,
-      );
-      pot.position.set(x, 0.25, z);
-      const leaves = new THREE.Mesh(
-        new THREE.IcosahedronGeometry(0.5, 1),
-        new THREE.MeshStandardMaterial({
-          color: "#3f9d78",
-          roughness: 0.8,
-          flatShading: true,
-        }),
-      );
-      leaves.position.set(x, 0.95, z);
-      pot.castShadow = leaves.castShadow = true;
-      this.scene.add(pot, leaves);
-    }
+      [-6.4, -4.4],
+      [6.4, 4.4],
+      [-6.3, 4.3],
+      [2.9, -4.5],
+      [6.4, -1.2],
+    ])
+      this.buildPlant(x, z);
   }
 
   private buildDesk(key: string, desk: { x: number; z: number; face: number }) {
@@ -385,60 +645,99 @@ export class OfficeScene {
     group.position.set(desk.x, 0, desk.z);
     group.rotation.y = desk.face;
     const command = key === "astra";
-    const top = new THREE.Mesh(
-      command
-        ? new THREE.CylinderGeometry(1.15, 1.15, 0.12, 40)
-        : new THREE.BoxGeometry(1.5, 0.1, 0.8),
-      this.deskMat,
-    );
-    top.position.y = 0.78;
-    top.castShadow = top.receiveShadow = true;
-    const base = new THREE.Mesh(
-      command
-        ? new THREE.CylinderGeometry(0.5, 0.7, 0.74, 24)
-        : new THREE.BoxGeometry(1.3, 0.72, 0.1),
-      this.deskMat,
-    );
-    base.position.set(0, 0.37, command ? 0 : -0.3);
-    base.castShadow = true;
-    const color = palette[key]?.[0] ?? "#4169E1";
-    const monitorMat = new THREE.MeshStandardMaterial({
-      color: "#0d1426",
+    let monitorZ = -0.22;
+    if (command) {
+      const top = new THREE.Mesh(
+        new THREE.CylinderGeometry(1.05, 1.05, 0.1, 16),
+        this.woodMat,
+      );
+      top.position.y = 0.74;
+      const leg = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.18, 0.3, 0.72, 8),
+        this.darkWoodMat,
+      );
+      leg.position.y = 0.36;
+      top.castShadow = top.receiveShadow = leg.castShadow = !this.lowPower;
+      group.add(top, leg);
+      for (let i = 0; i < 5; i++) {
+        const angle = (i / 5) * Math.PI * 2 + 0.6;
+        const chair = new THREE.Group();
+        chair.position.set(Math.sin(angle) * 1.45, 0, Math.cos(angle) * 1.45);
+        chair.rotation.y = angle;
+        this.box([0.5, 0.08, 0.5], [0, 0.45, 0], lambert("#3a3a40"), chair);
+        this.box([0.5, 0.5, 0.08], [0, 0.72, 0.24], lambert("#33333a"), chair);
+        group.add(chair);
+      }
+      monitorZ = -0.4;
+    } else {
+      this.box([1.6, 0.08, 0.8], [0, 0.74, 0], this.woodMat, group);
+      for (const [x, z] of [
+        [-0.72, -0.32],
+        [0.72, -0.32],
+        [-0.72, 0.32],
+        [0.72, 0.32],
+      ])
+        this.box([0.08, 0.7, 0.08], [x, 0.35, z], this.darkWoodMat, group);
+      this.box([0.5, 0.03, 0.18], [0, 0.8, 0.12], lambert("#2a2a2e"), group);
+      const chair = new THREE.Group();
+      chair.position.set(0, 0, 0.75);
+      this.box([0.5, 0.08, 0.5], [0, 0.45, 0], lambert("#3a3a40"), chair);
+      this.box([0.5, 0.55, 0.08], [0, 0.75, 0.24], lambert("#33333a"), chair);
+      group.add(chair);
+    }
+    const color = palette[key]?.[1] ?? "#a6f0e8";
+    const monitorMat = new THREE.MeshLambertMaterial({
+      color: "#101418",
       emissive: color,
-      emissiveIntensity: 0.12,
-      roughness: 0.4,
+      emissiveIntensity: 0.15,
     });
-    const monitor = new THREE.Mesh(
-      new THREE.BoxGeometry(command ? 0.9 : 0.8, 0.5, 0.05),
+    monitorMat.userData.level = 0.15;
+    this.screens.push(monitorMat);
+    const monitor = this.box(
+      [command ? 0.6 : 0.72, 0.44, 0.05],
+      [0, 1.06, monitorZ],
       monitorMat,
+      group,
     );
-    monitor.position.set(0, 1.12, command ? -0.75 : -0.22);
-    monitor.castShadow = true;
     monitor.name = `monitor:${key}`;
-    group.add(top, base, monitor);
+    this.box([0.06, 0.2, 0.06], [0, 0.86, monitorZ - 0.03], lambert("#2a2a2e"), group);
     this.scene.add(group);
+  }
+
+  private buildShelf(x: number, z: number, rotation: number) {
+    const shelf = new THREE.Group();
+    shelf.position.set(x, 0, z);
+    shelf.rotation.y = rotation;
+    this.box([1.8, 2.1, 0.45], [0, 1.05, 0], this.darkWoodMat, shelf);
+    const books = ["#7a3b2e", "#2f5d50", "#c08a3e", "#3d4f7a", "#6b6b3a", "#8c6a8f"];
+    for (let row = 0; row < 3; row++)
+      for (let i = 0; i < 9; i++)
+        this.box(
+          [0.13, 0.42 - (i % 3) * 0.05, 0.3],
+          [-0.72 + i * 0.18, 0.5 + row * 0.62, 0.1],
+          lambert(books[(row * 5 + i * 7) % books.length]),
+          shelf,
+        );
+    this.scene.add(shelf);
+  }
+
+  private buildPlant(x: number, z: number) {
+    this.box([0.4, 0.42, 0.4], [x, 0.21, z], lambert("#7a4a2f"));
+    const leaves = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(0.42, 0),
+      this.leavesMat,
+    );
+    leaves.position.set(x, 0.78, z);
+    leaves.castShadow = !this.lowPower;
+    this.scene.add(leaves);
   }
 
   private createBot(agent: SceneAgent): Bot {
     const [main, soft] = palette[agent.characterKey] ?? ["#4169E1", "#F2C75C"];
-    const mainMat = new THREE.MeshStandardMaterial({
-      color: main,
-      roughness: 0.45,
-      metalness: 0.1,
-    });
-    const softMat = new THREE.MeshStandardMaterial({
-      color: "#f4f7fb",
-      roughness: 0.35,
-    });
-    const accentMat = new THREE.MeshStandardMaterial({
-      color: soft,
-      roughness: 0.4,
-    });
-    const screenMat = new THREE.MeshStandardMaterial({
-      color: "#0b1020",
-      roughness: 0.2,
-      metalness: 0.3,
-    });
+    const mainMat = lambert(main);
+    const softMat = lambert("#efece6");
+    const accentMat = lambert(soft);
+    const screenMat = lambert("#0b1020");
     const eyeMat = new THREE.MeshBasicMaterial({ color: "#8ff7ff" });
 
     const root = new THREE.Group();
@@ -446,24 +745,20 @@ export class OfficeScene {
     root.add(body);
 
     const torso = new THREE.Mesh(
-      new THREE.CapsuleGeometry(0.24, 0.22, 6, 16),
+      new THREE.CapsuleGeometry(0.24, 0.22, 2, 8),
       mainMat,
     );
     torso.position.y = 0.48;
-    const belly = new THREE.Mesh(new THREE.CircleGeometry(0.11, 20), accentMat);
+    const belly = new THREE.Mesh(new THREE.CircleGeometry(0.11, 8), accentMat);
     belly.position.set(0, 0.5, 0.235);
     const feet = [-0.12, 0.12].map((x) => {
-      const foot = new THREE.Mesh(
-        new THREE.SphereGeometry(0.1, 14, 10),
-        softMat,
-      );
-      foot.scale.set(1, 0.6, 1.3);
-      foot.position.set(x, 0.07, 0.03);
+      const foot = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.1, 0.24), softMat);
+      foot.position.set(x, 0.05, 0.03);
       return foot;
     });
     const arms = [-1, 1].map((side) => {
       const arm = new THREE.Mesh(
-        new THREE.CapsuleGeometry(0.06, 0.16, 4, 10),
+        new THREE.CapsuleGeometry(0.06, 0.16, 2, 6),
         mainMat,
       );
       arm.position.set(side * 0.31, 0.5, 0.02);
@@ -472,22 +767,18 @@ export class OfficeScene {
     });
     body.add(torso, belly, ...feet, ...arms);
 
-    // หัวใหญ่แบบ chibi + จอหน้าแสดงตา
     const head = new THREE.Group();
     head.position.y = 1.04;
     const shell =
       agent.characterKey === "forge"
         ? new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.62, 0.66), softMat)
-        : new THREE.Mesh(new THREE.SphereGeometry(0.42, 28, 20), softMat);
+        : new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8), softMat);
     if (agent.characterKey !== "forge") shell.scale.set(1.08, 0.86, 0.92);
-    const face = new THREE.Mesh(new THREE.CircleGeometry(0.27, 28), screenMat);
+    const face = new THREE.Mesh(new THREE.CircleGeometry(0.27, 10), screenMat);
     face.scale.set(1.2, 0.78, 1);
     face.position.z = agent.characterKey === "forge" ? 0.335 : 0.375;
     const eyes = [-0.11, 0.11].map((x) => {
-      const eye = new THREE.Mesh(
-        new THREE.CapsuleGeometry(0.035, 0.06, 4, 8),
-        eyeMat,
-      );
+      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.1, 0.02), eyeMat);
       eye.position.set(x, 0.01, face.position.z + 0.01);
       return eye;
     });
@@ -496,7 +787,7 @@ export class OfficeScene {
     // เอกลักษณ์ silhouette ของแต่ละตัว (ทรงเรขาคณิตต้นฉบับ)
     if (agent.characterKey === "astra") {
       const halo = new THREE.Mesh(
-        new THREE.TorusGeometry(0.3, 0.035, 8, 32),
+        new THREE.TorusGeometry(0.3, 0.035, 4, 12),
         accentMat,
       );
       halo.rotation.x = Math.PI / 2;
@@ -504,16 +795,13 @@ export class OfficeScene {
       head.add(halo);
     } else if (agent.characterKey === "mira") {
       for (const x of [-0.3, 0.3]) {
-        const bun = new THREE.Mesh(
-          new THREE.SphereGeometry(0.13, 16, 12),
-          accentMat,
-        );
+        const bun = new THREE.Mesh(new THREE.SphereGeometry(0.13, 6, 5), accentMat);
         bun.position.set(x, 0.3, 0);
         head.add(bun);
       }
     } else if (agent.characterKey === "scout") {
       const visor = new THREE.Mesh(
-        new THREE.TorusGeometry(0.4, 0.04, 8, 32, Math.PI),
+        new THREE.TorusGeometry(0.4, 0.04, 4, 12, Math.PI),
         accentMat,
       );
       visor.position.set(0, 0.06, 0.05);
@@ -521,61 +809,53 @@ export class OfficeScene {
       head.add(visor);
     } else if (agent.characterKey === "vector") {
       const ring = new THREE.Mesh(
-        new THREE.TorusGeometry(0.1, 0.025, 8, 20),
+        new THREE.TorusGeometry(0.1, 0.025, 4, 8),
         accentMat,
       );
       ring.position.y = 0.72;
       head.add(ring);
     } else {
-      const band = new THREE.Mesh(
-        new THREE.BoxGeometry(0.82, 0.08, 0.7),
-        accentMat,
-      );
-      band.position.y = 0.22;
-      head.add(band);
+      this.box([0.82, 0.08, 0.7], [0, 0.22, 0], accentMat, head);
     }
     const stalk = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.015, 0.015, 0.22, 6),
+      new THREE.CylinderGeometry(0.015, 0.015, 0.22, 4),
       mainMat,
     );
     stalk.position.y = 0.46;
-    const beacon = new THREE.MeshStandardMaterial({
-      color: "#7f8ba3",
-      emissive: "#7f8ba3",
+    const beacon = new THREE.MeshLambertMaterial({
+      color: statusColor.idle,
+      emissive: statusColor.idle,
       emissiveIntensity: 1.2,
     });
-    const bulb = new THREE.Mesh(
-      new THREE.SphereGeometry(0.055, 12, 10),
-      beacon,
-    );
+    const bulb = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), beacon);
     bulb.position.y = 0.6;
     head.add(stalk, bulb);
     body.add(head);
 
     root.traverse((object) => {
       if ((object as THREE.Mesh).isMesh) {
-        object.castShadow = true;
+        object.castShadow = !this.lowPower;
         object.userData.agentId = agent.id;
       }
     });
 
     const ringMat = new THREE.MeshBasicMaterial({
-      color: "#7f8ba3",
+      color: statusColor.idle,
       transparent: true,
-      opacity: 0.7,
+      opacity: 0.8,
     });
-    const ring = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.5, 40), ringMat);
-    ring.rotation.x = -Math.PI / 2;
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.4, 0.5, 4), ringMat);
+    ring.rotation.set(-Math.PI / 2, 0, Math.PI / 4);
     ring.position.y = 0.02;
     ring.userData.agentId = agent.id;
     root.add(ring);
 
     const label = document.createElement("div");
     label.className = "bot-label";
-    label.style.setProperty("--agent-color", main);
-    label.innerHTML = "<b></b><small></small>";
+    label.innerHTML =
+      '<span class="runtime-badge" aria-hidden="true"></span><span class="bot-label-text"><b></b><small></small></span>';
     const tag = new CSS2DObject(label);
-    tag.position.set(0, 1.85, 0);
+    tag.position.set(0, 1.95, 0);
     root.add(tag);
 
     const desk = desks[agent.characterKey] ?? desks.astra;
@@ -599,8 +879,8 @@ export class OfficeScene {
       beacon,
       ring: ringMat,
       monitor:
-        (monitor?.material as THREE.MeshStandardMaterial) ??
-        new THREE.MeshStandardMaterial(),
+        (monitor?.material as THREE.MeshLambertMaterial) ??
+        new THREE.MeshLambertMaterial(),
       label,
       target: root.position.clone(),
       facing: desk.face + Math.PI,
@@ -618,35 +898,32 @@ export class OfficeScene {
       (child as THREE.Line).geometry.dispose();
       ((child as THREE.Line).material as THREE.Material).dispose();
     }
-    let working = 0;
     for (const bot of this.bots.values()) {
-      if (bot.data.status !== "working") continue;
-      working++;
-      if (bot.data.characterKey === "astra") continue;
+      if (bot.data.status !== "working" || bot.data.characterKey === "astra")
+        continue;
       const desk = desks[bot.data.characterKey];
       if (!desk) continue;
-      const end = new THREE.Vector3(desk.x, 1.4, desk.z);
+      const end = new THREE.Vector3(desk.x, 1.3, desk.z);
       const mid = this.holo.position.clone().lerp(end, 0.5);
-      mid.y += 1.2;
+      mid.y += 1.1;
       const curve = new THREE.QuadraticBezierCurve3(
         this.holo.position.clone(),
         mid,
         end,
       );
       const line = new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints(curve.getPoints(40)),
+        new THREE.BufferGeometry().setFromPoints(curve.getPoints(24)),
         new THREE.LineDashedMaterial({
-          color: palette[bot.data.characterKey]?.[0] ?? "#7DB4FF",
-          dashSize: 0.18,
-          gapSize: 0.12,
+          color: "#ebae42",
+          dashSize: 0.2,
+          gapSize: 0.14,
           transparent: true,
-          opacity: 0.85,
+          opacity: 0.9,
         }),
       );
       line.computeLineDistances();
       this.beams.add(line);
     }
-    this.holoMat.color.set(working ? "#47d6a0" : "#7DB4FF");
   }
 
   private loop = () => {
@@ -655,40 +932,65 @@ export class OfficeScene {
     if (document.hidden) return;
     this.sinceRender += this.clock.getDelta();
     if (this.sinceRender < this.minFrame) return;
-    const dt = Math.min(this.sinceRender, 0.1);
+    const dt = Math.min(this.sinceRender, 0.1) * this.speed;
     this.sinceRender = 0;
-    const time = this.clock.elapsedTime;
-    const still = this.options.reducedMotion;
+    const time = this.clock.elapsedTime * this.speed;
+    const still = this.options.reducedMotion || this.paused;
 
-    if (!still) {
-      this.holo.rotation.y += dt * 0.6;
-      this.holo.rotation.x += dt * 0.2;
-    }
-    // เส้นมอบหมายงาน ASTRA → ผู้รับงาน กระพริบเบา ๆ (คงที่เมื่อ reduced motion)
+    if (!still) this.holo.rotation.y += dt * 0.8;
     this.beams.children.forEach((line) => {
       ((line as THREE.Line).material as THREE.Material).opacity = still
-        ? 0.85
-        : 0.55 + Math.sin(time * 3) * 0.3;
+        ? 0.9
+        : 0.6 + Math.sin(time * 3) * 0.3;
     });
+    for (const screen of this.screens)
+      screen.emissiveIntensity +=
+        ((screen.userData.level ?? 0.15) * this.screenLevel -
+          screen.emissiveIntensity) *
+        0.1;
 
     for (const bot of this.bots.values()) this.stepBot(bot, dt, time, still);
+    this.stepCamera();
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
     this.labels.render(this.scene, this.camera);
   };
+
+  /** เลื่อนกล้องไปยังเป้าหมายแบบนุ่มนวล และกันไม่ให้หลุดออกนอกห้อง */
+  private stepCamera() {
+    const target = this.controls.target;
+    if (this.panGoal) {
+      const step = this.panGoal
+        .clone()
+        .sub(target)
+        .multiplyScalar(this.options.reducedMotion ? 1 : 0.12);
+      target.add(step);
+      this.camera.position.add(step);
+      if (target.distanceTo(this.panGoal) < 0.02) this.panGoal = null;
+    }
+    const clamped = target.clone();
+    clamped.x = THREE.MathUtils.clamp(clamped.x, ROOM.minX, ROOM.maxX);
+    clamped.z = THREE.MathUtils.clamp(clamped.z, ROOM.minZ, ROOM.maxZ);
+    clamped.y = this.home.y;
+    if (!clamped.equals(target)) {
+      const fix = clamped.sub(target);
+      target.add(fix);
+      this.camera.position.add(fix);
+    }
+  }
 
   private stepBot(bot: Bot, dt: number, time: number, still: boolean) {
     const { root, body, head, arms, data } = bot;
     const toTarget = bot.target.clone().sub(root.position);
     toTarget.y = 0;
     const distance = toTarget.length();
-    const walking = distance > 0.05;
+    const walking = distance > 0.05 && !this.paused;
 
     if (walking) {
       const step = Math.min(distance, dt * 1.3);
       root.position.add(toTarget.normalize().multiplyScalar(step));
       this.turn(root, Math.atan2(toTarget.x, toTarget.z), dt * 6);
-    } else {
+    } else if (!this.paused) {
       this.turn(root, bot.facing, dt * 4);
       bot.wait -= dt;
       if (
@@ -696,7 +998,6 @@ export class OfficeScene {
         data.characterKey !== "astra" &&
         bot.wait <= 0
       ) {
-        // ว่างงาน: เดินเล่นไปจุดพักแบบสุ่ม
         const next = waypoints[Math.floor(Math.random() * waypoints.length)];
         bot.target.set(
           next.x + (Math.random() - 0.5) * 0.8,
@@ -705,7 +1006,7 @@ export class OfficeScene {
         );
         bot.facing = Math.random() * Math.PI * 2;
         bot.wait = 3 + Math.random() * 5;
-        if (still) root.position.copy(bot.target);
+        if (this.options.reducedMotion) root.position.copy(bot.target);
       }
     }
 
@@ -721,7 +1022,6 @@ export class OfficeScene {
       arms[1].rotation.x = -Math.sin(t * 9) * 0.6;
       head.rotation.z = 0;
     } else if (data.status === "working") {
-      // พิมพ์งานที่โต๊ะ
       body.position.y = Math.sin(t * 2) * 0.01;
       arms[0].rotation.x = -1.1 + Math.sin(t * 14) * 0.18;
       arms[1].rotation.x = -1.1 + Math.cos(t * 13) * 0.18;
@@ -740,7 +1040,7 @@ export class OfficeScene {
       arms.forEach((arm) => (arm.rotation.x = Math.sin(t * 2) * 0.08));
       head.rotation.set(0, Math.sin(t * 0.7) * 0.25, 0);
     }
-    bot.blink -= 1 / 60;
+    bot.blink -= dt;
     const closed = bot.blink < 0.12;
     bot.eyes.forEach((eye) => (eye.scale.y = closed ? 0.15 : 1));
     if (bot.blink < 0) bot.blink = 2.5 + Math.random() * 3;
@@ -757,9 +1057,13 @@ export class OfficeScene {
     if (!width || !height) return;
     this.renderer.setSize(width, height, false);
     this.labels.setSize(width, height);
-    this.camera.aspect = width / height;
-    // จอแคบ: ถอยกล้องให้เห็นครบทั้งทีม
-    this.camera.fov = width < 700 ? 58 : 42;
+    const aspect = width / height;
+    // ให้เห็นทั้งห้องในแนวนอนเสมอ ทั้งจอกว้างและคอลัมน์แคบ
+    const halfH = Math.max(6.2, 9 / aspect);
+    this.camera.left = -halfH * aspect;
+    this.camera.right = halfH * aspect;
+    this.camera.top = halfH;
+    this.camera.bottom = -halfH;
     this.camera.updateProjectionMatrix();
   }
 
@@ -781,6 +1085,7 @@ export class OfficeScene {
   };
 
   private onHover = (event: PointerEvent) => {
+    if (event.buttons) return;
     this.renderer.domElement.style.cursor = this.pick(event)
       ? "pointer"
       : "grab";

@@ -103,8 +103,9 @@ test("home: 3D stage, project detail and CEO order via fixture IPC", async ({
       () => (globalThis as unknown as { calls: string[] }).calls,
     ),
   ).toContain("create_workflow");
-  await page.getByRole("button", { name: "Console" }).click();
+  await page.getByRole("link", { name: "ภาพรวม" }).click();
   await expect(page).toHaveURL(/view=console/);
+  await page.getByRole("link", { name: /คิวงาน/ }).click();
   await expect(
     page.getByRole("heading", { name: "Task queue & workflows" }),
   ).toBeVisible();
@@ -123,4 +124,8 @@ test("home preview without Desktop keeps chat disabled", async ({ page }) => {
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+  await page.getByRole("link", { name: "แชท CEO" }).click();
+  await expect(page).toHaveURL(/view=chat/);
+  await expect(page.getByLabel("ข้อความถึง CEO")).toBeDisabled();
+  await expect(page.locator(".home-stage")).toHaveCount(0);
 });

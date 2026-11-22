@@ -58,7 +58,7 @@ fn migration_from_schema1_preserves_runs_and_agent_customization() {
             .unwrap()
             .pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))
             .unwrap(),
-        4
+        5
     );
     assert!(store.scheduler_paused().unwrap());
 }

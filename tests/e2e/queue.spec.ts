@@ -81,7 +81,7 @@ test("queue UI fixture: create draft, inspect approval request and pause schedul
       },
     };
   }, agents);
-  await page.goto("/?view=console");
+  await page.goto("/?view=console&page=tasks");
   await page.getByRole("button", { name: "Add task", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await dialog
@@ -109,7 +109,7 @@ test("queue UI fixture: create draft, inspect approval request and pause schedul
     .click();
   await expect(
     page.getByRole("button", { name: /QUEUE FIXTURE TASK/ }),
-  ).toContainText("queued");
+  ).toContainText("เข้าคิว");
   await page.getByRole("button", { name: "Resume scheduling" }).click();
   await expect(
     page.getByRole("button", { name: "Pause scheduling" }),

@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 
 export function Modal({
   title,
@@ -12,6 +12,7 @@ export function Modal({
   busy?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   const close = useRef(onClose);
   close.current = onClose;
   useEffect(() => {
@@ -26,14 +27,14 @@ export function Modal({
   return (
     <dialog
       ref={ref}
-      aria-labelledby="modal-title"
+      aria-labelledby={titleId}
       onCancel={(event) => {
         event.preventDefault();
         if (!busy) close.current();
       }}
     >
       <header className="modal-header">
-        <h2 id="modal-title">{title}</h2>
+        <h2 id={titleId}>{title}</h2>
         <button
           type="button"
           disabled={busy}

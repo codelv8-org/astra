@@ -167,7 +167,11 @@ export function App() {
     return (
       <div className="shell">
         {header}
-        <main id="main" className="login tile">
+        <main
+          id="main"
+          className="login glass"
+          aria-busy={session.isPending || busy}
+        >
           <img
             src="/crewbots/astra/portrait.svg"
             alt="ASTRA"
@@ -199,7 +203,7 @@ export function App() {
               />
             </label>
             <button className="primary" disabled={busy}>
-              เข้าสู่ระบบ
+              {busy ? "กำลังเข้าสู่ระบบ…" : "เข้าสู่ระบบ"}
             </button>
           </form>
           {error && (
@@ -220,6 +224,12 @@ export function App() {
     <div className="shell">
       {header}
       <main id="main" className="bento">
+        <header className="workspace-heading span-12">
+          <h1>Astra Remote</h1>
+          <p className="muted">
+            เลือกเครื่อง Windows เพื่อดูงานที่แชร์และติดตามผลการรัน
+          </p>
+        </header>
         {error && (
           <p role="alert" className="error span-12">
             {error}
@@ -255,7 +265,7 @@ export function App() {
               จับคู่อุปกรณ์
             </button>
           </div>
-          <div className="device-list">
+          <div className="device-list" aria-busy={devices.isPending}>
             {devices.data?.map((d) => (
               <button
                 key={d.id}
@@ -283,7 +293,12 @@ export function App() {
                 </small>
               </button>
             ))}
-            {!devices.data?.length && (
+            {devices.isPending && (
+              <p role="status" className="hint">
+                กำลังโหลดอุปกรณ์…
+              </p>
+            )}
+            {devices.isSuccess && !devices.data.length && (
               <p className="hint">
                 ยังไม่มีอุปกรณ์ สร้าง pairing code แล้วกรอกใน Astra Desktop
               </p>

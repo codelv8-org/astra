@@ -1,23 +1,44 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import type { Agent, Snapshot } from "../../../../packages/shared/src";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type MouseEvent,
+} from "react";
+import type { Snapshot } from "../../../../packages/shared/src";
 import { bridge } from "../bridge";
+import {
+  chatExecutionRef,
+  readExecutionResult,
+  type ExecutionResultRef,
+} from "../executionResult";
+import { ExecutionResultView } from "../ExecutionResultView";
+import { Modal } from "../../../../packages/ui/src/Modal";
+import { pageHref, type DesktopPage } from "../pages";
+import { worldById, type WorldId } from "./worlds";
 import "./home.css";
-import { AstraMark, ThemeGlyph } from "../../../../packages/ui/src/AstraMark";
 import type { OfficeScene, SceneAgent } from "./OfficeScene";
+import { AgentPanel } from "./AgentPanel";
+import { Minimap } from "./Minimap";
+import { WorkspaceSidebar } from "./WorkspaceSidebar";
+import { ChatApprovals } from "./ChatApprovals";
+import { GenUI } from "./genui/GenUI";
+import { parseGenUI, validateGenUI } from "./genui/spec";
+import { progressGenUI, workflowGenUI } from "./genui/workflow";
 import {
   acceptedReport,
   agentName,
-  astraResultCandidates,
+  agentResultCandidates,
   changeReports,
-  clip,
   diffTasks,
-  displayPath,
+  handoffRoute,
+  handoffStatus,
   isProgressQuery,
   progressOf,
   progressReport,
   sceneAgents,
   sortTasks,
-  statusLabels,
   statusMap,
   stepLabels,
   type ChatMessage,
@@ -33,7 +54,17 @@ interface Stored {
 function load(): Stored {
   try {
     const value = JSON.parse(localStorage.getItem(storageKey) ?? "null");
-    if (value && Array.isArray(value.messages)) return value as Stored;
+    if (value && Array.isArray(value.messages)) {
+      const stored = value as Stored;
+      return {
+        ...stored,
+        messages: stored.messages.map((message) => ({
+          ...message,
+          genUI:
+            message.from === "owner" ? undefined : validateGenUI(message.genUI),
+        })),
+      };
+    }
   } catch {
     /* storage ใช้ไม่ได้ เริ่มใหม่ */
   }
@@ -41,14 +72,17 @@ function load(): Stored {
 }
 function save(value: Stored) {
   try {
-    localStorage.setItem(
-      storageKey,
-      JSON.stringify({
-        ...value,
-        messages: value.messages.slice(-200),
-        seen: value.seen.slice(-200),
-      }),
-    );
+    const next = {
+      ...value,
+      messages: value.messages.slice(-200),
+      seen: value.seen.slice(-200),
+    };
+    let encoded = JSON.stringify(next);
+    while (encoded.length > 2_000_000 && next.messages.length > 1) {
+      next.messages.splice(0, Math.ceil(next.messages.length / 4));
+      encoded = JSON.stringify(next);
+    }
+    localStorage.setItem(storageKey, encoded);
   } catch {
     /* ไม่บังคับ */
   }
@@ -60,33 +94,34 @@ const time = (value: string) =>
     hour: "2-digit",
     minute: "2-digit",
   });
-const statusTone: Record<string, string> = {
-  completed: "ok",
-  running: "run",
-  failed: "bad",
-  blocked: "bad",
-  ready: "wait",
-  needs_review: "wait",
-  draft: "wait",
-  queued: "run",
-};
+const sidebarKey = "astra-workspace-sidebar";
+function readSidebar() {
+  try {
+    return localStorage.getItem(sidebarKey) !== "closed";
+  } catch {
+    return true;
+  }
+}
 
 export function HomePage({
+  chatOnly,
   data,
   native,
   theme,
-  onToggleTheme,
-  onOpenConsole,
-  onSelectAgent,
+  world,
+  onOpenPage,
   onAddProject,
   onRefresh,
 }: {
+  chatOnly: boolean;
   data: Snapshot;
   native: boolean;
   theme: string;
-  onToggleTheme: () => void;
-  onOpenConsole: (anchor?: string) => void;
-  onSelectAgent: (agent: Agent) => void;
+  world: WorldId;
+  onOpenPage: (
+    page: DesktopPage,
+    event?: MouseEvent<HTMLAnchorElement>,
+  ) => void;
   onAddProject: () => void;
   onRefresh: () => Promise<void>;
 }) {
@@ -104,14 +139,34 @@ export function HomePage({
   });
   const themeRef = useRef(theme);
   themeRef.current = theme;
+  const worldRef = useRef(world);
+  worldRef.current = world;
   const statesRef = useRef<SceneAgent[]>([]);
   const reduced = useMemo(
     () =>
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false,
     [],
   );
-  const agentsRef = useRef(data.agents);
-  agentsRef.current = data.agents;
+  const [focused, setFocused] = useState<string | null>(null);
+  const [drawer, setDrawer] = useState<"chat" | "agent" | null>("chat");
+  const [sidebarOpen, setSidebarOpen] = useState(readSidebar);
+  const [paused, setPaused] = useState(false);
+  const [speed, setSpeed] = useState(1);
+  function selectAgent(agentId: string | null) {
+    setFocused(agentId);
+    setDrawer(agentId ? "agent" : "chat");
+    scene.current?.setFocus(agentId);
+  }
+  const selectRef = useRef(selectAgent);
+  selectRef.current = selectAgent;
+  function toggleSidebar(open: boolean) {
+    setSidebarOpen(open);
+    try {
+      localStorage.setItem(sidebarKey, open ? "open" : "closed");
+    } catch {
+      /* ไม่บังคับ */
+    }
+  }
 
   const [selected, setSelected] = useState<string | null>(null);
   const [chatProject, setChatProject] = useState("");
@@ -120,10 +175,21 @@ export function HomePage({
   const [mock, setMock] = useState(false);
   const [busy, setBusy] = useState(false);
   const [chatError, setChatError] = useState("");
+  const [preview, setPreview] = useState<ExecutionResultRef | null>(null);
   const log = useRef<HTMLOListElement>(null);
   const loaded = native && Boolean(data.dataPath);
   const tasks = useMemo(() => data.tasks ?? [], [data.tasks]);
   const workflows = useMemo(() => data.workflows ?? [], [data.workflows]);
+  const chatWorkflow = workflows
+    .filter((workflow) => workflow.projectId === chatProject)
+    .reduce<
+      (typeof workflows)[number] | null
+    >((latest, workflow) => (!latest || workflow.createdAt > latest.createdAt ? workflow : latest), null);
+  const chatSteps = chatWorkflow
+    ? sortTasks(tasks.filter((task) => task.workflowId === chatWorkflow.id))
+    : [];
+  const tasksById = new Map(tasks.map((task) => [task.id, task]));
+  const currentStep = progressOf(chatSteps).current;
 
   // ---- 3D scene (โหลด three.js แบบ lazy เพื่อให้ Console เปิดได้เร็ว) ----
   useEffect(() => {
@@ -135,10 +201,8 @@ export function HomePage({
       instance = new OfficeScene(stage.current, {
         theme: themeRef.current === "light" ? "light" : "dark",
         reducedMotion: reduced,
-        onSelect: (agentId) => {
-          const agent = agentsRef.current.find((item) => item.id === agentId);
-          if (agent) onSelectAgent(agent);
-        },
+        world: worldRef.current,
+        onSelect: (agentId) => selectRef.current(agentId),
       });
       instance.setAgents(statesRef.current);
       scene.current = instance;
@@ -148,7 +212,7 @@ export function HomePage({
       instance?.dispose();
       scene.current = null;
     };
-  }, [webgl]);
+  }, [chatOnly, webgl]);
   useEffect(
     () => scene.current?.setTheme(theme === "light" ? "light" : "dark"),
     [theme],
@@ -156,6 +220,9 @@ export function HomePage({
   const agentStates = useMemo(() => sceneAgents(data), [data]);
   statesRef.current = agentStates;
   useEffect(() => scene.current?.setAgents(agentStates), [agentStates]);
+  useEffect(() => scene.current?.setPaused(paused), [paused]);
+  useEffect(() => scene.current?.setWorld(world), [world]);
+  useEffect(() => scene.current?.setSpeed(speed), [speed]);
 
   // ---- CEO chat: ติดตามการเปลี่ยนสถานะจริงจาก Core ----
   function append(
@@ -181,14 +248,22 @@ export function HomePage({
   }
   const storedRef = useRef(stored);
   storedRef.current = stored;
+  const readingResults = useRef(new Set<string>());
+  const chatMounted = useRef(false);
+  useEffect(() => {
+    chatMounted.current = true;
+    return () => {
+      chatMounted.current = false;
+    };
+  }, []);
   useEffect(() => {
     if (!loaded) return;
     const current = storedRef.current;
     if (!current.baseline) {
       // ครั้งแรก: จำสถานะปัจจุบันเป็นจุดตั้งต้น ไม่ย้อนรายงานประวัติทั้งหมด
-      const seen = (data.tasks ?? [])
-        .map((task) => task.lastExecutionId)
-        .filter((value): value is string => Boolean(value));
+      const seen = data.executions
+        .filter((run) => run.status === "completed")
+        .map((run) => run.id);
       append(
         [
           {
@@ -204,42 +279,80 @@ export function HomePage({
     const changes = diffTasks(current.baseline, tasks);
     if (changes.length)
       append(changeReports(changes, data), { baseline: statusMap(tasks) });
-    // ผลจริงของ ASTRA (plan/summary) จาก execution event ชนิด result
-    const seen = new Set(current.seen);
-    const candidates = astraResultCandidates(data, seen);
+    const pending = readingResults.current;
+    const candidates = agentResultCandidates(
+      data,
+      new Set([...current.seen, ...pending]),
+    );
     if (!candidates.length) return;
-    candidates.forEach(({ execution }) => seen.add(execution.id));
-    setStored((previous) => ({ ...previous, seen: [...seen] }));
+    candidates.forEach(({ execution }) => pending.add(execution.id));
     void Promise.all(
       candidates.map(async ({ task, execution }) => {
-        const events = await bridge.events(execution.id, 0).catch(() => []);
-        const result = [...events]
-          .reverse()
-          .find((event) => event.kind === "result");
-        if (!result?.text) return null;
+        const result = await readExecutionResult((after) =>
+          bridge.events(execution.id, after),
+        ).catch(() => null);
+        if (result === null) return null;
         const mockRun = execution.adapter === "mock";
+        const output =
+          result &&
+          (mockRun
+            ? { text: result.text, ui: undefined }
+            : parseGenUI(result.text));
         return {
-          from: "ceo" as const,
-          source: mockRun ? ("mock" as const) : ("model" as const),
-          runtime: mockRun
-            ? "MOCK · ไม่มี AI model"
-            : execution.adapter.toUpperCase(),
-          projectId: task.projectId,
-          workflowId: task.workflowId ?? undefined,
-          text: `${stepLabels[task.step] ?? task.title}:\n${clip(result.text, 1800)}`,
+          executionId: execution.id,
+          message: result?.text.trim()
+            ? {
+                id: `execution:${execution.id}`,
+                at: result.createdAt,
+                from:
+                  task.agentId === "astra"
+                    ? ("ceo" as const)
+                    : ("agent" as const),
+                agentId: task.agentId,
+                source: mockRun ? ("mock" as const) : ("model" as const),
+                runtime: mockRun
+                  ? "MOCK · ไม่มี AI model"
+                  : execution.adapter.toUpperCase(),
+                projectId: task.projectId,
+                workflowId: task.workflowId ?? undefined,
+                text: `ส่งผลขั้น${stepLabels[task.step] ?? task.title}${output?.text ? `\n${output.text.length > 1800 ? `${output.text.slice(0, 1799)}…` : output.text}` : ""}`,
+                genUI: output?.ui,
+              }
+            : null,
         };
       }),
-    ).then((messages) =>
-      append(
-        messages.filter((item) => item !== null),
-        { seen: [...seen] },
-      ),
-    );
-  }, [loaded, tasks]);
+    )
+      .then((results) => {
+        if (!chatMounted.current) return;
+        const read = results.filter((result) => result !== null);
+        if (!read.length) return;
+        setStored((previous) => {
+          const seen = new Set(previous.seen);
+          const fresh = read.filter((result) => !seen.has(result.executionId));
+          if (!fresh.length) return previous;
+          const next = {
+            ...previous,
+            seen: [...seen, ...fresh.map((result) => result.executionId)],
+            messages: [
+              ...previous.messages,
+              ...fresh.flatMap(({ message }) => (message ? [message] : [])),
+            ],
+          };
+          save(next);
+          return next;
+        });
+      })
+      .finally(() =>
+        candidates.forEach(({ execution }) => pending.delete(execution.id)),
+      );
+  }, [loaded, tasks, data.executions]);
 
   useEffect(() => {
-    log.current?.lastElementChild?.scrollIntoView({ block: "end" });
-  }, [stored.messages.length]);
+    const message = log.current?.lastElementChild;
+    message?.scrollIntoView({
+      block: message.classList.contains("has-genui") ? "start" : "end",
+    });
+  }, [chatOnly, stored.messages.length]);
   useEffect(() => {
     if (!chatProject && data.projects.length)
       setChatProject(data.projects[0].id);
@@ -257,6 +370,7 @@ export function HomePage({
           from: "ceo",
           source: "core",
           text: progressReport(data, chatProject || null),
+          genUI: progressGenUI(data, chatProject || null),
         },
       ]);
       setDraft("");
@@ -291,6 +405,7 @@ export function HomePage({
             fresh ?? { ...data, workflows: [...workflows, workflow] },
             mock,
           ),
+          genUI: fresh ? workflowGenUI(fresh, workflow) : undefined,
         },
       ]);
     } catch (cause) {
@@ -313,437 +428,491 @@ export function HomePage({
           data,
           scope === "all" ? null : chatProject || null,
         ),
+        genUI: progressGenUI(
+          data,
+          scope === "all" ? null : chatProject || null,
+        ),
       },
     ]);
   }
 
-  const project = data.projects.find((item) => item.id === selected) ?? null;
-  const running = tasks.filter((task) => task.status === "running").length;
-  const approvals = tasks.filter(
-    (task) => task.gate && ["ready", "needs_review"].includes(task.status),
-  ).length;
+  function draftFromGenUI(text: string, projectId?: string) {
+    if (!loaded || busy) return;
+    const target = projectId ?? chatProject;
+    if (target && !data.projects.some((project) => project.id === target)) {
+      setChatError("ไม่พบโปรเจกต์ของผลลัพธ์นี้");
+      return;
+    }
+    if (draft.trim() && target !== chatProject) {
+      setChatError("ยังมีร่างข้อความของโปรเจกต์ที่เลือกอยู่");
+      document.getElementById("ceo-input")?.focus();
+      return;
+    }
+    const next = [draft.trim(), text.trim()].filter(Boolean).join("\n\n");
+    if (next.length > 4000) {
+      setChatError("ร่างข้อความยาวเกิน 4,000 ตัวอักษร กรุณาย่อข้อความก่อน");
+      return;
+    }
+    setChatError("");
+    if (target) setChatProject(target);
+    setDraft(next);
+    document.getElementById("ceo-input")?.focus();
+  }
 
-  return (
-    <div className="home">
-      <header className="home-topbar glass">
-        <a
-          className="brand"
-          href="#home"
-          onClick={(event) => event.preventDefault()}
-        >
-          <AstraMark />
-          <span>Astra</span>
-        </a>
-        <div className="home-pills" aria-label="สถานะสรุป">
+  const running = tasks.filter((task) => task.status === "running").length;
+  const chatProgress = progressOf(chatSteps);
+  const flowTone = chatProgress.running
+    ? ["run", "กำลังทำ"]
+    : chatProgress.waiting
+      ? ["wait", "รอคุณ"]
+      : chatProgress.total && chatProgress.completed === chatProgress.total
+        ? ["ok", "เสร็จแล้ว"]
+        : ["idle", chatWorkflow ? "หยุดอยู่" : "ยังไม่มีงาน"];
+  const focusedAgent = data.agents.find((agent) => agent.id === focused);
+
+  function openNewGoal() {
+    setDrawer("chat");
+    requestAnimationFrame(() => document.getElementById("ceo-input")?.focus());
+  }
+
+  const projectSelect = (
+    <>
+      <label className="sr-only" htmlFor="ceo-project">
+        โปรเจกต์ที่สั่งงาน
+      </label>
+      <select
+        id="ceo-project"
+        value={chatProject}
+        disabled={!loaded || busy}
+        onChange={(event) => setChatProject(event.target.value)}
+      >
+        <option value="">เลือกโปรเจกต์</option>
+        {data.projects.map((item) => (
+          <option key={item.id} value={item.id}>
+            {item.name}
+          </option>
+        ))}
+      </select>
+    </>
+  );
+
+  const chatPanel = (
+    <section
+      className="drawer-panel home-chat"
+      id="home-chat"
+      tabIndex={-1}
+      aria-label="แชทกับ CEO"
+    >
+      <header className="drawer-head">
+        <img
+          className="agent-avatar"
+          data-agent="astra"
+          src="/crewbots/astra/portrait.svg"
+          alt=""
+          width="48"
+          height="48"
+        />
+        <div className="drawer-title">
+          <h2>ASTRA · CEO</h2>
+          <p>
+            {chatWorkflow
+              ? `การส่งต่องาน · ${chatWorkflow.id.slice(0, 8)} · ${flowTone[1]}`
+              : "รับงาน ส่งต่อ และรายงานผลจากทีม"}
+          </p>
+        </div>
+        {!chatOnly && (
+          <button
+            type="button"
+            className="icon quiet"
+            aria-label="ปิดแชท"
+            onClick={() => setDrawer(null)}
+          >
+            ×
+          </button>
+        )}
+      </header>
+      <div className="chat-thread">
+        {loaded && chatProject && (
+          <ChatApprovals
+            key={chatProject}
+            data={data}
+            projectId={chatProject}
+            onRefresh={onRefresh}
+          />
+        )}
+        {chatWorkflow && chatSteps.length > 0 && (
+          <details className="chat-handoffs" key={chatWorkflow.id}>
+            <summary>
+              <strong>การส่งต่องาน · {chatWorkflow.id.slice(0, 8)}</strong>
+              <span>
+                {currentStep
+                  ? `${handoffRoute(currentStep, tasksById, data.agents)} · ${handoffStatus(currentStep)}`
+                  : "ทุกขั้นสิ้นสุดแล้ว"}
+              </span>
+            </summary>
+            <p>{chatWorkflow.objective}</p>
+            <ol aria-label="ลำดับการส่งต่องาน">
+              {chatSteps.map((task) => (
+                <li key={task.id}>
+                  <strong>{handoffRoute(task, tasksById, data.agents)}</strong>
+                  <span>
+                    {stepLabels[task.step] ?? task.title} ·{" "}
+                    {handoffStatus(task)}
+                  </span>
+                </li>
+              ))}
+            </ol>
+            <button className="link" onClick={() => onOpenPage("tasks")}>
+              เปิด Task queue ↗
+            </button>
+          </details>
+        )}
+        <ol className="chat-log" ref={log} aria-live="polite">
+          {stored.messages.map((message) => {
+            const resultRef = native && chatExecutionRef(message);
+            const speaker = message.agentId ?? "astra";
+            return (
+              <li
+                key={message.id}
+                className={`bubble ${message.from}${message.genUI ? " has-genui" : ""}`}
+              >
+                {message.from !== "owner" && (
+                  <span className="bubble-meta">
+                    {agentName(data.agents, speaker)} ·{" "}
+                    {message.runtime ?? "สถานะจาก Core"}
+                    {message.workflowId &&
+                      ` · ${message.workflowId.slice(0, 8)}`}
+                  </span>
+                )}
+                <div className="bubble-body">
+                  <p>{message.text}</p>
+                  {message.genUI && (
+                    <GenUI
+                      spec={message.genUI}
+                      onDraft={(text) => draftFromGenUI(text, message.projectId)}
+                    />
+                  )}
+                </div>
+                <span className="bubble-time">
+                  {time(message.at)}
+                  {resultRef && (
+                    <button
+                      type="button"
+                      className="link"
+                      onClick={() => setPreview(resultRef)}
+                    >
+                      ดูผลการรัน
+                    </button>
+                  )}
+                  {message.link === "queue" && (
+                    <button
+                      className="link"
+                      onClick={() => onOpenPage("tasks")}
+                    >
+                      เปิด Task queue ↗
+                    </button>
+                  )}
+                </span>
+              </li>
+            );
+          })}
+          {!stored.messages.length && (
+            <li className="bubble ceo">
+              <div className="bubble-body">
+                <p>
+                  {native
+                    ? "กำลังเชื่อมต่อ Core…"
+                    : "แชทกับ CEO ใช้ได้ใน Astra Desktop เท่านั้น"}
+                </p>
+              </div>
+            </li>
+          )}
+        </ol>
+      </div>
+      <div className="chips">
+        <button disabled={!loaded} onClick={() => quickReport("project")}>
+          รายงานความคืบหน้า
+        </button>
+        <button disabled={!loaded} onClick={() => quickReport("all")}>
+          ทุกโปรเจกต์
+        </button>
+      </div>
+      <form className="chat-form" onSubmit={(event) => void send(event)}>
+        <div className="row">
+          {chatOnly ? (
+            projectSelect
+          ) : (
+            <span className="chat-target">
+              สั่งงานใน{" "}
+              <b>
+                {data.projects.find((item) => item.id === chatProject)?.name ??
+                  "— เลือกโปรเจกต์ด้านบน"}
+              </b>
+            </span>
+          )}
+          <label className="mock-toggle">
+            <input
+              type="checkbox"
+              checked={mock}
+              disabled={!loaded || busy}
+              onChange={(event) => setMock(event.target.checked)}
+            />
+            Mock
+          </label>
+        </div>
+        {chatError && (
+          <p role="alert" className="error-text">
+            {chatError}
+          </p>
+        )}
+        <div className="chat-compose">
+          <label className="sr-only" htmlFor="ceo-input">
+            ข้อความถึง CEO
+          </label>
+          <textarea
+            id="ceo-input"
+            rows={2}
+            maxLength={4000}
+            value={draft}
+            disabled={!loaded || busy}
+            placeholder="ข้อความ เช่น “เพิ่มหน้าตั้งค่าโปรไฟล์” หรือพิมพ์ “สถานะ”"
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (
+                event.key === "Enter" &&
+                !event.shiftKey &&
+                !event.nativeEvent.isComposing
+              ) {
+                event.preventDefault();
+                event.currentTarget.form?.requestSubmit();
+              }
+            }}
+          />
+          <button
+            className="primary"
+            disabled={!loaded || busy || !draft.trim()}
+          >
+            {busy ? "…" : "ส่ง"}
+          </button>
+        </div>
+      </form>
+    </section>
+  );
+
+  const previewModal = preview && (
+    <Modal title="ผลการรันที่บันทึกไว้" onClose={() => setPreview(null)}>
+      <ExecutionResultView {...preview} agents={data.agents} />
+    </Modal>
+  );
+
+  if (chatOnly)
+    return (
+      <main className="home home-chat-page" id="chat" tabIndex={-1}>
+        <header className="page-head">
+          <h1>แชท CEO</h1>
           <span className="chip" data-tone={native ? "ok" : "wait"}>
             <span className="dot" />
             {native
               ? "Desktop Core connected"
               : "Browser preview · Desktop required"}
           </span>
-          <span className="chip" data-tone={running ? "run" : "idle"}>
-            <span className="dot" />
-            กำลังทำ {running}
-          </span>
-          <span className="chip" data-tone={approvals ? "wait" : "idle"}>
-            <span className="dot" />
-            รออนุมัติ {approvals}
-          </span>
-        </div>
-        <div className="actions">
-          <button
-            className="icon quiet"
-            onClick={onToggleTheme}
-            aria-label="สลับ light/dark theme"
-            title={theme === "dark" ? "ธีมสว่าง" : "ธีมมืด"}
-          >
-            <ThemeGlyph theme={theme} />
-          </button>
-          <button className="primary" onClick={() => onOpenConsole()}>
-            Console
-          </button>
-        </div>
-      </header>
+        </header>
+        {chatPanel}
+        {previewModal}
+      </main>
+    );
 
-      <div
-        className="home-stage"
-        ref={stage}
-        role="img"
-        aria-label={`ออฟฟิศ 3D ของ CrewBots: ${agentStates.map((agent) => `${agent.name} ${agent.activity}`).join(", ")}`}
-      >
-        {!webgl && (
-          <div className="stage-fallback">
-            {data.agents.map((agent) => (
-              <button key={agent.id} onClick={() => onSelectAgent(agent)}>
-                <img
-                  src={`/crewbots/${agent.characterKey}/idle.svg`}
-                  alt=""
-                  width="90"
-                  height="105"
-                />
-                {agent.name}
-              </button>
-            ))}
-            <small>อุปกรณ์นี้ไม่รองรับ WebGL2 จึงแสดงแบบ 2D</small>
-          </div>
-        )}
-      </div>
+  return (
+    <main
+      className="home workspace"
+      id="home"
+      tabIndex={-1}
+      data-sidebar={sidebarOpen ? "open" : "closed"}
+      data-drawer={drawer ? "open" : "closed"}
+    >
+      {sidebarOpen && (
+        <WorkspaceSidebar
+          data={data}
+          native={native}
+          states={agentStates}
+          focused={focused}
+          selectedProject={selected}
+          onSelectProject={setSelected}
+          onSelectAgent={(agent) => selectAgent(agent.id)}
+          onAddProject={onAddProject}
+          onRefresh={onRefresh}
+          onAssignProject={(projectId) => {
+            setChatProject(projectId);
+            openNewGoal();
+          }}
+          onOpenRuntimes={() => onOpenPage("runtimes")}
+          onOpenQueue={() => onOpenPage("tasks")}
+          onCollapse={() => toggleSidebar(false)}
+        />
+      )}
 
-      <aside className="home-card home-projects glass" aria-label="รายการโปรเจกต์">
-        {project ? (
-          <ProjectDetail
-            project={project}
-            data={data}
-            onBack={() => setSelected(null)}
-            onAssign={() => {
-              setChatProject(project.id);
-              document.getElementById("ceo-input")?.focus();
-            }}
-            onOpenConsole={onOpenConsole}
-          />
-        ) : (
-          <>
-            <div className="card-head">
-              <div>
-                <h2>Projects</h2>
-                <p className="muted">
-                  {data.projects.length} approved workspaces
-                </p>
-              </div>
-              <button
-                className="icon"
-                disabled={!native}
-                onClick={onAddProject}
-                aria-label="เพิ่มโปรเจกต์"
-              >
-                ＋
-              </button>
-            </div>
-            {data.projects.length ? (
-              <ul className="home-project-list">
-                {data.projects.map((item) => {
-                  const progress = progressOf(
-                    tasks.filter((task) => task.projectId === item.id),
-                  );
-                  const count = workflows.filter(
-                    (flow) => flow.projectId === item.id,
-                  ).length;
-                  return (
-                    <li key={item.id}>
-                      <button
-                        onClick={() => setSelected(item.id)}
-                        aria-label={`ดูรายละเอียด ${item.name}`}
-                      >
-                        <span className="row">
-                          <b>{item.name}</b>
-                          <span className="chip">
-                            {item.isGit ? "Git" : "Folder"}
-                          </span>
-                        </span>
-                        <small>
-                          {item.goal
-                            ? clip(item.goal, 70)
-                            : "ยังไม่ได้กำหนด objective"}
-                        </small>
-                        <span className="meter" aria-hidden="true">
-                          <span style={{ width: `${progress.percent}%` }} />
-                        </span>
-                        <small className="row">
-                          <span>
-                            {count} งาน · {progress.completed}/{progress.total}{" "}
-                            ขั้น
-                          </span>
-                          <span>
-                            {progress.running
-                              ? `กำลังทำ ${progress.running}`
-                              : progress.waiting
-                                ? `รอ ${progress.waiting}`
-                                : `${progress.percent}%`}
-                          </span>
-                        </small>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <div className="empty compact">
-                <img
-                  src="/crewbots/astra/portrait.svg"
-                  alt=""
-                  width="64"
-                  height="59"
-                />
-                <p>
-                  {native
-                    ? "ยังไม่มีโปรเจกต์ กด ＋ เพื่อเลือก directory"
-                    : "เปิด Astra Desktop เพื่อดูโปรเจกต์"}
-                </p>
-              </div>
-            )}
-          </>
-        )}
-      </aside>
-
-      <aside className="home-card home-chat glass" aria-label="แชทกับ CEO">
-        <div className="card-head">
-          <img
-            src="/crewbots/astra/portrait.svg"
-            alt=""
-            width="40"
-            height="37"
-          />
-          <div>
-            <h2>ASTRA · CEO</h2>
-            <p className="muted">รับงาน แตกแผน และรายงานความคืบหน้า</p>
-          </div>
-        </div>
-        <ol className="chat-log" ref={log} aria-live="polite">
-          {stored.messages.map((message) => (
-            <li key={message.id} className={`bubble ${message.from}`}>
-              {message.from === "ceo" && (
-                <span className="bubble-meta">
-                  {message.source === "model"
-                    ? `ASTRA · ${message.runtime}`
-                    : message.source === "mock"
-                      ? message.runtime
-                      : "ASTRA · สรุปจากสถานะ Core"}
-                </span>
-              )}
-              <p>{message.text}</p>
-              <span className="bubble-time">
-                {time(message.at)}
-                {message.link === "queue" && (
-                  <button
-                    className="link"
-                    onClick={() => onOpenConsole("tasks")}
-                  >
-                    เปิด Task queue ↗
-                  </button>
-                )}
-              </span>
-            </li>
-          ))}
-          {!stored.messages.length && (
-            <li className="bubble ceo">
-              <p>
-                {native
-                  ? "กำลังเชื่อมต่อ Core…"
-                  : "แชทกับ CEO ใช้ได้ใน Astra Desktop เท่านั้น"}
-              </p>
-            </li>
-          )}
-        </ol>
-        <div className="chips">
-          <button disabled={!loaded} onClick={() => quickReport("project")}>
-            รายงานความคืบหน้า
-          </button>
-          <button disabled={!loaded} onClick={() => quickReport("all")}>
-            ทุกโปรเจกต์
-          </button>
-        </div>
-        <form className="chat-form" onSubmit={(event) => void send(event)}>
-          <div className="row">
-            <label className="sr-only" htmlFor="ceo-project">
-              โปรเจกต์ที่สั่งงาน
-            </label>
-            <select
-              id="ceo-project"
-              value={chatProject}
-              disabled={!loaded || busy}
-              onChange={(event) => setChatProject(event.target.value)}
-            >
-              <option value="">เลือกโปรเจกต์</option>
-              {data.projects.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
+      <section className="ws-stage" aria-labelledby="office-title">
+        <h2 id="office-title" className="sr-only">
+          ออฟฟิศ CrewBots
+        </h2>
+        <div
+          className="home-stage"
+          ref={stage}
+          role={webgl ? "img" : undefined}
+          aria-label={
+            webgl
+              ? agentStates
+                  .map((agent) => `${agent.name} ${agent.activity}`)
+                  .join(", ")
+              : undefined
+          }
+        >
+          {!webgl && (
+            <div className="stage-fallback">
+              {data.agents.map((agent) => (
+                <button key={agent.id} onClick={() => selectAgent(agent.id)}>
+                  <img
+                    src={`/crewbots/${agent.characterKey}/idle.svg`}
+                    alt=""
+                    width="72"
+                    height="84"
+                  />
+                  {agent.name}
+                </button>
               ))}
-            </select>
-            <label className="mock-toggle">
-              <input
-                type="checkbox"
-                checked={mock}
-                disabled={!loaded || busy}
-                onChange={(event) => setMock(event.target.checked)}
-              />
-              Mock
-            </label>
-          </div>
-          {chatError && (
-            <p role="alert" className="error-text">
-              {chatError}
-            </p>
+              <small>อุปกรณ์นี้ไม่รองรับ WebGL2 จึงแสดงแบบ 2D</small>
+            </div>
           )}
-          <div className="row">
-            <label className="sr-only" htmlFor="ceo-input">
-              ข้อความถึง CEO
-            </label>
-            <textarea
-              id="ceo-input"
-              rows={2}
-              maxLength={4000}
-              value={draft}
-              disabled={!loaded || busy}
-              placeholder="สั่งงาน เช่น “เพิ่มหน้าตั้งค่าโปรไฟล์” หรือพิมพ์ “สถานะ”"
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (
-                  event.key === "Enter" &&
-                  !event.shiftKey &&
-                  !event.nativeEvent.isComposing
-                ) {
-                  event.preventDefault();
-                  event.currentTarget.form?.requestSubmit();
-                }
-              }}
-            />
+        </div>
+
+        <div className="stage-toolbar">
+          {!sidebarOpen && (
             <button
-              className="primary"
-              disabled={!loaded || busy || !draft.trim()}
+              type="button"
+              className="icon quiet"
+              aria-label="แสดงแถบทีม"
+              onClick={() => toggleSidebar(true)}
             >
-              {busy ? "…" : "ส่ง"}
+              »
+            </button>
+          )}
+          {projectSelect}
+          <span className="chip" data-tone={flowTone[0]}>
+            {flowTone[1]}
+          </span>
+          <button
+            type="button"
+            className="primary"
+            disabled={!loaded}
+            onClick={openNewGoal}
+          >
+            ＋ งานใหม่
+          </button>
+        </div>
+
+        {webgl && (
+          <div className="stage-zoom" role="group" aria-label="มุมมองฉาก">
+            <button
+              type="button"
+              className="icon quiet"
+              aria-label="ซูมเข้า"
+              onClick={() => scene.current?.zoomBy(1.25)}
+            >
+              ＋
+            </button>
+            <button
+              type="button"
+              className="icon quiet"
+              aria-label="ซูมออก"
+              onClick={() => scene.current?.zoomBy(0.8)}
+            >
+              －
+            </button>
+            <button
+              type="button"
+              className="icon quiet"
+              aria-label="ดูทั้งห้อง"
+              onClick={() => scene.current?.fit()}
+            >
+              ⛶
             </button>
           </div>
-        </form>
-      </aside>
+        )}
+        {webgl && <Minimap scene={scene} />}
 
-      <div className="home-legend glass" aria-hidden="true">
-        {[
-          ["working", "กำลังทำ"],
-          ["waiting", "รออนุมัติ/ตรวจ"],
-          ["error", "ล้มเหลว"],
-          ["idle", "ว่าง"],
-        ].map(([key, label]) => (
-          <span key={key} data-status={key}>
-            {label}
+        <div className="stage-playback" role="group" aria-label="การแสดงผลฉาก">
+          {webgl && (
+            <button
+              type="button"
+              className="quiet"
+              aria-pressed={paused}
+              onClick={() => setPaused(!paused)}
+            >
+              {paused ? "▶ เล่นต่อ" : "❚❚ หยุดภาพ"}
+            </button>
+          )}
+          <span
+            className="chip"
+            data-tone={native ? "ok" : "wait"}
+            title={
+              native
+                ? "Desktop Core connected"
+                : "Browser preview · Desktop required"
+            }
+          >
+            <span className="dot" />
+            {native ? "Live" : "Preview"}
           </span>
-        ))}
-        <span className="hint">ลากเพื่อหมุน · คลิกหุ่นเพื่อดูรายละเอียด</span>
-      </div>
-    </div>
-  );
-}
+          {webgl && (
+            <button
+              type="button"
+              className="quiet"
+              aria-label={`ความเร็วภาพ ${speed}x`}
+              onClick={() => setSpeed(speed === 1 ? 2 : 1)}
+            >
+              {speed}x
+            </button>
+          )}
+          <a
+            className="playback-note"
+            href={pageHref("themes")}
+            onClick={(event) => onOpenPage("themes", event)}
+          >
+            ธีม: {worldById(world).name}
+          </a>
+          {running > 0 && (
+            <span className="playback-note">กำลังทำ {running}</span>
+          )}
+          <button
+            type="button"
+            className="quiet"
+            aria-pressed={drawer === "chat"}
+            onClick={() => setDrawer(drawer === "chat" ? null : "chat")}
+          >
+            แชท
+          </button>
+        </div>
+      </section>
 
-function ProjectDetail({
-  project,
-  data,
-  onBack,
-  onAssign,
-  onOpenConsole,
-}: {
-  project: Snapshot["projects"][number];
-  data: Snapshot;
-  onBack: () => void;
-  onAssign: () => void;
-  onOpenConsole: (anchor?: string) => void;
-}) {
-  const tasks = (data.tasks ?? []).filter(
-    (task) => task.projectId === project.id,
-  );
-  const flows = (data.workflows ?? [])
-    .filter((flow) => flow.projectId === project.id)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const runs = data.executions
-    .filter((run) => run.projectId === project.id)
-    .slice(0, 5);
-  const progress = progressOf(tasks);
-  return (
-    <div className="project-detail">
-      <button className="link back" onClick={onBack}>
-        ← Projects
-      </button>
-      <h2>{project.name}</h2>
-      <p>{project.goal || "ยังไม่ได้กำหนด objective"}</p>
-      <code>{displayPath(project.path)}</code>
-      <dl className="mini-metrics">
-        <div>
-          <dt>ความคืบหน้า</dt>
-          <dd>{progress.percent}%</dd>
-        </div>
-        <div>
-          <dt>กำลังทำ</dt>
-          <dd>{progress.running}</dd>
-        </div>
-        <div>
-          <dt>รอ</dt>
-          <dd>{progress.waiting}</dd>
-        </div>
-        <div>
-          <dt>ล้มเหลว</dt>
-          <dd>{progress.failed}</dd>
-        </div>
-      </dl>
-      <h3>Workflows</h3>
-      {flows.length ? (
-        <ul className="flow-list">
-          {flows.map((flow) => {
-            const steps = sortTasks(
-              tasks.filter((task) => task.workflowId === flow.id),
-            );
-            const p = progressOf(steps);
-            return (
-              <li key={flow.id}>
-                <b>{clip(flow.objective, 80)}</b>
-                <small>
-                  {flow.status} · {p.completed}/{p.total} ·{" "}
-                  {new Date(flow.createdAt).toLocaleDateString("th-TH")}
-                </small>
-                <ol className="steps" aria-label="ขั้นตอน">
-                  {steps.map((task) => (
-                    <li
-                      key={task.id}
-                      data-tone={statusTone[task.status] ?? "idle"}
-                      title={`${stepLabels[task.step] ?? task.title} · ${agentName(data.agents, task.agentId)} · ${statusLabels[task.status] ?? task.status}`}
-                    >
-                      <span className="sr-only">
-                        {stepLabels[task.step] ?? task.title}{" "}
-                        {statusLabels[task.status] ?? task.status}
-                      </span>
-                    </li>
-                  ))}
-                </ol>
-                {p.current && (
-                  <small>
-                    ตอนนี้: {stepLabels[p.current.step] ?? p.current.title} ·{" "}
-                    {agentName(data.agents, p.current.agentId)} ·{" "}
-                    {statusLabels[p.current.status] ?? p.current.status}
-                    {p.current.blocker
-                      ? ` — ${clip(p.current.blocker, 80)}`
-                      : ""}
-                  </small>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      ) : (
-        <p className="muted">ยังไม่มี workflow สั่งงานผ่าน CEO ได้ทางขวา</p>
+      {drawer && (
+        <aside className="ws-drawer" aria-label="แผงรายละเอียด">
+          {drawer === "agent" && focusedAgent ? (
+            <AgentPanel
+              agent={focusedAgent}
+              state={agentStates.find((item) => item.id === focusedAgent.id)}
+              data={data}
+              onClose={() => selectAgent(null)}
+              onOpenQueue={() => onOpenPage("tasks")}
+              onOpenResult={(executionId, projectId) =>
+                setPreview({ executionId, projectId })
+              }
+            />
+          ) : (
+            chatPanel
+          )}
+        </aside>
       )}
-      <h3>Executions ล่าสุด</h3>
-      {runs.length ? (
-        <ul className="run-list">
-          {runs.map((run) => (
-            <li key={run.id}>
-              <span>
-                {run.adapter === "mock" ? "[MOCK] " : ""}
-                {agentName(data.agents, run.agentId)}
-              </span>
-              <small>
-                {run.status} · {time(run.createdAt)}
-              </small>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="muted">ยังไม่มี execution</p>
-      )}
-      <div className="detail-actions">
-        <button className="primary" onClick={onAssign}>
-          สั่งงาน CEO
-        </button>
-        <button onClick={() => onOpenConsole("tasks")}>เปิด Task queue</button>
-      </div>
-    </div>
+      {previewModal}
+    </main>
   );
 }

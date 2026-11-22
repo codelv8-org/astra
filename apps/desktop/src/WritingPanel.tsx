@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { bridge } from "./bridge";
+import { PatchFileDiff } from "./PatchFileDiff";
 
 export interface WritingInfo {
   policy: { path: string; before: string | null }[] | null;
@@ -16,26 +17,38 @@ export function WritingPanel({
   status,
   attempts,
   refresh,
+  onBusy,
+  disabled = false,
+  approvalOnly = false,
+  diff = true,
 }: {
   taskId: string;
   status: string;
   attempts: number;
   refresh: () => Promise<void>;
+  onBusy: (busy: boolean) => void;
+  disabled?: boolean;
+  approvalOnly?: boolean;
+  /** false เมื่อหน้าที่เรียกแสดง diff เองแล้ว (เช่นหน้า Review) */
+  diff?: boolean;
 }) {
-  const [info, setInfo] = useState<WritingInfo | null>(null);
+  const [loaded, setLoaded] = useState<{ key: string; info: WritingInfo }>();
   const [paths, setPaths] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [reviewed, setReviewed] = useState(false);
+  const [reviewedDigest, setReviewedDigest] = useState<string | null>(null);
+  const [revision, setRevision] = useState(0);
+  const key = `${taskId}:${status}:${revision}`;
+  const info = loaded?.key === key ? loaded.info : null;
+  const digest = info?.digest;
+  const reviewed = Boolean(digest && digest === reviewedDigest);
   useEffect(() => {
     let active = true;
+    setReviewedDigest(null);
     void bridge
       .writingInfo(taskId)
       .then((value) => {
-        if (active) {
-          setInfo(value);
-          setReviewed(false);
-        }
+        if (active) setLoaded({ key, info: value });
       })
       .catch((e) => {
         if (active) setError(String(e));
@@ -43,19 +56,22 @@ export function WritingPanel({
     return () => {
       active = false;
     };
-  }, [taskId, status]);
+  }, [taskId, key]);
   async function act(action: () => Promise<void>) {
+    if (busy || disabled) return;
     setBusy(true);
+    onBusy(true);
     setError("");
+    setReviewedDigest(null);
     try {
       await action();
-      setInfo(await bridge.writingInfo(taskId));
-      setReviewed(false);
       await refresh();
     } catch (e) {
       setError(String(e));
     } finally {
+      setRevision((value) => value + 1);
       setBusy(false);
+      onBusy(false);
     }
   }
   return (
@@ -70,6 +86,7 @@ export function WritingPanel({
           {error}
         </p>
       )}
+      {!info && !error && <p role="status">กำลังอ่านข้อมูลการเขียน…</p>}
       {info?.policy && (
         <p>Approved paths: {info.policy.map((f) => f.path).join(", ")}</p>
       )}
@@ -85,7 +102,7 @@ export function WritingPanel({
             />
           </label>
           <button
-            disabled={busy || !paths.trim()}
+            disabled={disabled || busy || !paths.trim()}
             onClick={() =>
               void act(() =>
                 bridge.configureWriting(
@@ -102,55 +119,60 @@ export function WritingPanel({
           </button>
         </>
       )}
-      {info?.patch && (
+      {info?.patch && digest && (
         <>
-          <p>
-            Patch: {info.patch.state} · SHA256 {info.digest}
+          <p className="patch-digest">
+            Patch: {info.patch.state} · SHA256 {digest}
           </p>
-          {info.patch.files.map((file) => (
-            <details key={file.path} open>
-              <summary>{file.path}</summary>
-              <p>Before</p>
-              <pre className="task-prompt">
-                {info.patch!.before.find((f) => f.path === file.path)?.before ??
-                  "(new file)"}
-              </pre>
-              <p>After</p>
-              <pre className="task-prompt">{file.content}</pre>
-            </details>
-          ))}
+          {diff &&
+            info.patch.files.map((file, index) => (
+            <PatchFileDiff
+              key={file.path}
+              path={file.path}
+              before={
+                info.patch?.before.find((f) => f.path === file.path)?.before ??
+                null
+              }
+              after={file.content}
+              open={index === 0}
+            />
+            ))}
           <label className="checkbox">
             <input
               type="checkbox"
               checked={reviewed}
-              onChange={(e) => setReviewed(e.target.checked)}
+              disabled={busy || disabled}
+              onChange={(e) =>
+                setReviewedDigest(e.target.checked ? digest : null)
+              }
             />
             ฉันตรวจเนื้อหาและ paths ทั้งหมดแล้ว
           </label>
           {info.patch.state === "staged" && (
             <button
-              disabled={busy || !reviewed || status !== "needs_review"}
+              disabled={
+                disabled || busy || !reviewed || status !== "needs_review"
+              }
               onClick={() =>
-                void act(() =>
-                  bridge.writingAction(taskId, "apply", info.digest!),
-                )
+                void act(() => bridge.writingAction(taskId, "apply", digest))
               }
             >
               Approve & apply exact patch
             </button>
           )}
-          {["applying", "applied"].includes(info.patch.state) && (
-            <button
-              disabled={busy || !reviewed}
-              onClick={() =>
-                void act(() =>
-                  bridge.writingAction(taskId, "rollback", info.digest!),
-                )
-              }
-            >
-              Review rollback
-            </button>
-          )}
+          {!approvalOnly &&
+            ["applying", "applied"].includes(info.patch.state) && (
+              <button
+                disabled={disabled || busy || !reviewed}
+                onClick={() =>
+                  void act(() =>
+                    bridge.writingAction(taskId, "rollback", digest),
+                  )
+                }
+              >
+                Review rollback
+              </button>
+            )}
         </>
       )}
     </section>

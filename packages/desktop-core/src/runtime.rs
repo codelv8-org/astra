@@ -109,11 +109,27 @@ impl Core {
                         },
                         _ => "unknown".into(),
                     },
+                    // agy ไม่มีคำสั่งตรวจ login จึงยืนยันจากรันที่จบล่าสุดว่าสำเร็จหรือไม่
+                    "antigravity" => match self.store.runtime_confirmed_at(adapter) {
+                        Ok(Some(_)) => "authenticated".into(),
+                        _ => "unknown".into(),
+                    },
                     _ => "unknown".into(),
                 };
                 match fingerprint(&path).and_then(|hash| {
                     self.store.connect()?.execute("INSERT INTO runtime_configs VALUES(?1,?2,?3) ON CONFLICT(adapter) DO UPDATE SET executable=excluded.executable,sha256=excluded.sha256",params![adapter,path.to_string_lossy(),hash]).map_err(|e|e.to_string())?; Ok(())
-                }) { Ok(())=>diagnostic.message="Read-only/plan adapter; explicit task approval required. Antigravity authentication is confirmed only by actual execution.".into(),Err(error)=>{diagnostic.supported=false;diagnostic.message=error;} }
+                }) {
+                    Ok(()) => {
+                        diagnostic.message = match (adapter, self.store.runtime_confirmed_at(adapter)) {
+                            ("antigravity", Ok(Some(at))) => format!("Read-only/plan adapter; explicit task approval required. Antigravity authentication confirmed by the last successful run at {at}."),
+                            _ => "Read-only/plan adapter; explicit task approval required. Antigravity authentication is confirmed only by actual execution.".into(),
+                        }
+                    }
+                    Err(error) => {
+                        diagnostic.supported = false;
+                        diagnostic.message = error;
+                    }
+                }
             }
             result.push(diagnostic);
         }
@@ -278,13 +294,25 @@ impl Core {
             } else {
                 crate::adapters::arguments(&request.adapter)
             })
+            .args(if writing {
+                Vec::new()
+            } else {
+                crate::adapters::extra_dir_args(&request.adapter, &project)
+            })
             .current_dir(&project.path)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true);
+        // งาน writing ไม่บอก folder รอง: patch จำกัดใน primary
+        let prompt = match crate::adapters::folders_context(&project).filter(|_| !writing) {
+            Some(context) => format!("{context}
+
+{}", request.prompt),
+            None => request.prompt.clone(),
+        };
         if request.adapter == "antigravity" {
-            command.arg(&request.prompt);
+            command.arg(&prompt);
         }
         let mut child = command
             .spawn()
@@ -300,7 +328,7 @@ impl Core {
         if let Some(mut input) = child.stdin.take() {
             if request.adapter != "antigravity" {
                 input
-                    .write_all(crate::adapters::input(&request.adapter, &request.prompt).as_bytes())
+                    .write_all(crate::adapters::input(&request.adapter, &prompt).as_bytes())
                     .await
                     .map_err(|e| format!("Cannot send prompt: {e}"))?;
             }

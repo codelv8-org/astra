@@ -1,8 +1,10 @@
 pub mod adapters;
+pub mod folders;
 pub mod models;
 pub mod queue;
 pub mod remote;
 pub mod runtime;
+pub mod storage;
 pub mod store;
 pub mod writing;
 pub use runtime::Core;

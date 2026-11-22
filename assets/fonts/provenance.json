@@ -12,5 +12,68 @@
     "source": "https://seed.line.me/src/images/fonts/LINE_Seed_Sans_TH.zip",
     "license": "SIL OFL 1.1",
     "modified": false
+  },
+  {
+    "file": "assets/fonts/ibm-plex-sans-thai-latin-400-normal.woff2",
+    "sha256": "82ddd36544e4776857cce6ab26d0e509d10c1eeddf872c1b16f421489b0096a7",
+    "source": "https://registry.npmjs.org/@fontsource/ibm-plex-sans-thai/-/ibm-plex-sans-thai-5.3.0.tgz",
+    "license": "SIL OFL 1.1",
+    "modified": false
+  },
+  {
+    "file": "assets/fonts/ibm-plex-sans-thai-latin-500-normal.woff2",
+    "sha256": "50cf74f017a2d3a07154e829a48d259c52cb4c068e80bed3b75a3dbe024d7168",
+    "source": "https://registry.npmjs.org/@fontsource/ibm-plex-sans-thai/-/ibm-plex-sans-thai-5.3.0.tgz",
+    "license": "SIL OFL 1.1",
+    "modified": false
+  },
+  {
+    "file": "assets/fonts/ibm-plex-sans-thai-latin-600-normal.woff2",
+    "sha256": "2a1bc932c82cf188c06d8f29797dd31bc0604229571e08f340d816aa9e4014b4",
+    "source": "https://registry.npmjs.org/@fontsource/ibm-plex-sans-thai/-/ibm-plex-sans-thai-5.3.0.tgz",
+    "license": "SIL OFL 1.1",
+    "modified": false
+  },
+  {
+    "file": "assets/fonts/ibm-plex-sans-thai-latin-ext-400-normal.woff2",
+    "sha256": "20e71a8635466748fba07aa4dfd8ba2e2f00fb9480cf490357735a6101e2604f",
+    "source": "https://registry.npmjs.org/@fontsource/ibm-plex-sans-thai/-/ibm-plex-sans-thai-5.3.0.tgz",
+    "license": "SIL OFL 1.1",
+    "modified": false
+  },
+  {
+    "file": "assets/fonts/ibm-plex-sans-thai-latin-ext-500-normal.woff2",
+    "sha256": "5dd17f81b73f5d230276b51e671b6c1947f7b9e0310b4dc900e410baa35740e7",
+    "source": "https://registry.npmjs.org/@fontsource/ibm-plex-sans-thai/-/ibm-plex-sans-thai-5.3.0.tgz",
+    "license": "SIL OFL 1.1",
+    "modified": false
+  },
+  {
+    "file": "assets/fonts/ibm-plex-sans-thai-latin-ext-600-normal.woff2",
+    "sha256": "1c5d96f1c642f4c6de3f79ea757212e728bf8d5c46599983f8f7115563d77491",
+    "source": "https://registry.npmjs.org/@fontsource/ibm-plex-sans-thai/-/ibm-plex-sans-thai-5.3.0.tgz",
+    "license": "SIL OFL 1.1",
+    "modified": false
+  },
+  {
+    "file": "assets/fonts/ibm-plex-sans-thai-thai-400-normal.woff2",
+    "sha256": "2d66381c26d32bf2a95bfe559d1a5ed5475fcdac3fa128e45a33301010d42056",
+    "source": "https://registry.npmjs.org/@fontsource/ibm-plex-sans-thai/-/ibm-plex-sans-thai-5.3.0.tgz",
+    "license": "SIL OFL 1.1",
+    "modified": false
+  },
+  {
+    "file": "assets/fonts/ibm-plex-sans-thai-thai-500-normal.woff2",
+    "sha256": "7e01c133031aba4ca902d81930096f0224d83f808014c1232016b49e0a7ecff6",
+    "source": "https://registry.npmjs.org/@fontsource/ibm-plex-sans-thai/-/ibm-plex-sans-thai-5.3.0.tgz",
+    "license": "SIL OFL 1.1",
+    "modified": false
+  },
+  {
+    "file": "assets/fonts/ibm-plex-sans-thai-thai-600-normal.woff2",
+    "sha256": "ea935955dc3bccb684f8fb772dbd429250dd0d3dfee9483995a3ee3456471df8",
+    "source": "https://registry.npmjs.org/@fontsource/ibm-plex-sans-thai/-/ibm-plex-sans-thai-5.3.0.tgz",
+    "license": "SIL OFL 1.1",
+    "modified": false
   }
 ]

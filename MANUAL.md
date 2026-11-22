@@ -19,6 +19,19 @@ pnpm desktop:build
 pnpm test:e2e
 ```
 
+## สร้าง Windows installer
+
+ใช้ Windows x64 และเครื่องมือ MSVC ตามรายการข้างต้น รันจาก root ของ repository
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/cargo.ps1 -Action desktop-installer
+Get-FileHash target/release/bundle/nsis/Astra_0.1.0_x64-setup.exe -Algorithm SHA256
+```
+
+Installer แบบ NSIS ติดตั้งเฉพาะผู้ใช้ปัจจุบัน ค่าเริ่มต้นคือ `%LOCALAPPDATA%\Astra` (รุ่นที่ติดตั้งชื่อ CrewNest ก่อนหน้าอยู่ `%LOCALAPPDATA%\CrewNest` ให้ถอนการติดตั้งเดิมก่อน ฐานข้อมูลอ้าง identifier เดิมจึงไม่หาย) ไฟล์ทดสอบยังไม่มีลายเซ็น Authenticode ถ้าเครื่องยังไม่มี WebView2 วิธีติดตั้งเริ่มต้นจะดาวน์โหลด bootstrapper จึงต้องมีอินเทอร์เน็ตในขั้นตอนนั้น การทดสอบ Web UI ให้ใช้ in-app browser ที่เชื่อถือใบรับรองของ test origin
+
+ก่อนอัปเกรด ให้หยุด scheduling และงานที่กำลังรัน จากนั้นปิด Desktop และสำรอง SQLite ด้วย SQLite backup API ฐานข้อมูลของ release อยู่ใน `%LOCALAPPDATA%\local.crewnest.desktop` ให้เก็บแยกจากไฟล์ติดตั้ง ใช้ [คู่มือ Phase 3](docs/PHASE_3_REMOTE.md) สำหรับ TLS, migration, deployment และ rollback ของ Web/API
+
 `pnpm dev` เปิดเฉพาะ frontend preview บน loopback `127.0.0.1:1420` ไม่มี local execution backend ต้องใช้ `pnpm desktop` สำหรับแอปจริง `tools/cargo.ps1` เตรียม MSVC environment เฉพาะ process; ไม่เปลี่ยน Windows configuration
 
 Runtime Codex ที่ตรวจในเครื่องนี้: `codex exec --help`, `codex login --help`, `codex login status` Adapter ใช้ `exec --json --sandbox read-only --ignore-user-config --ephemeral --skip-git-repo-check --color never -` และส่ง prompt ผ่าน stdin ไม่มี shell interpolation หรือ bypass flag ไม่รองรับ custom user-config provider ใน Phase 1
