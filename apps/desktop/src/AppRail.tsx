@@ -16,6 +16,7 @@ export const railEntries: RailEntry[] = [
   { page: "agents", label: "ทีม", icon: "users" },
   { page: "runtimes", label: "Runtime", icon: "plug" },
   { page: "storage", label: "พื้นที่จัดเก็บ", icon: "database" },
+  { page: "brain", label: "Second Brain", icon: "book" },
 ];
 
 export function AppRail({

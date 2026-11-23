@@ -67,3 +67,12 @@ describe("Astra Desktop navigation", () => {
     },
   );
 });
+
+describe("Second Brain", async () => {
+  const { obsidianUri } = await import("../../apps/desktop/src/SecondBrainPanel");
+  it("encodes the vault path into an obsidian:// link", () => {
+    expect(obsidianUri(String.raw`X:\second brain&notes`)).toBe(
+      "obsidian://open?path=X%3A%5Csecond%20brain%26notes",
+    );
+  });
+});

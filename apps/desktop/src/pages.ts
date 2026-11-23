@@ -6,6 +6,7 @@ export const consolePages = [
   { id: "agents", label: "ทีม" },
   { id: "runtimes", label: "Runtime" },
   { id: "storage", label: "พื้นที่จัดเก็บ" },
+  { id: "brain", label: "Second Brain" },
   { id: "themes", label: "ธีมโลก" },
   { id: "remote", label: "Remote" },
 ] as const;

@@ -39,6 +39,7 @@ import { Themes } from "./Themes";
 import { readWorld, saveWorld, type WorldId } from "./home/worlds";
 import { FolderList } from "./home/FolderList";
 import { StoragePanel } from "./StoragePanel";
+import { SecondBrainPanel } from "./SecondBrainPanel";
 import { addDraft, removeDraft, type FolderRow } from "./home/folders";
 
 const empty: Snapshot = {
@@ -646,6 +647,7 @@ export function App() {
             )}
 
             {page === "storage" && <StoragePanel native={native} />}
+            {page === "brain" && <SecondBrainPanel native={native} />}
             {page === "runtimes" && (
               <Connectors
                 data={data}
