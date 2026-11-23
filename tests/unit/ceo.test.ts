@@ -9,6 +9,8 @@ import { readExecutionResult } from "../../apps/desktop/src/executionResult";
 import agents from "../../packages/shared/default-agents.json";
 import {
   agentResultCandidates,
+  chatTarget,
+  directTaskInput,
   changeReports,
   chatApprovalLabel,
   diffTasks,
@@ -280,5 +282,54 @@ describe("Home CEO reports", () => {
         projectId,
       ),
     ).toContain("1/2 (50%)");
+  });
+});
+
+describe("Home group chat room", () => {
+  const roster = snapshot([]).agents;
+  it("routes @mentions to one agent and keeps plain text for the team", () => {
+    expect(chatTarget("@MIRA  ช่วยดูหน้า login", roster, "")).toEqual({
+      agentId: "mira",
+      text: "ช่วยดูหน้า login",
+    });
+    expect(chatTarget("@nobody hi", roster, "")).toEqual({
+      agentId: "",
+      text: "@nobody hi",
+    });
+    expect(chatTarget(" สถานะ ", roster, "forge")).toEqual({
+      agentId: "forge",
+      text: "สถานะ",
+    });
+  });
+  it("builds an approval-gated direct task that asks for GenUI", () => {
+    const mira = roster.find((agent) => agent.id === "mira")!;
+    const real = directTaskInput(mira, projectId, "hello", false);
+    expect(real).toMatchObject({ agentId: "mira", dependencies: [] });
+    expect(real.adapter).toBe(mira.runtimeAdapter);
+    expect(real.prompt).toContain("genui");
+    const mock = directTaskInput(mira, projectId, "hello", true);
+    expect(mock.adapter).toBe("mock");
+    expect(mock.prompt).not.toContain("genui");
+  });
+  it("reports results of direct chat tasks outside workflows", () => {
+    const direct = { ...task(3, "completed"), workflowId: null };
+    const data = snapshot([direct]);
+    data.executions = [
+      {
+        id: "direct-run",
+        taskId: direct.id,
+        agentId: "mira",
+        projectId,
+        adapter: "codex",
+        status: "completed",
+        prompt: "",
+        createdAt: "",
+        finishedAt: "",
+        error: null,
+        pid: null,
+        sessionId: null,
+      },
+    ];
+    expect(agentResultCandidates(data, new Set())).toHaveLength(1);
   });
 });

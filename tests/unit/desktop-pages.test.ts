@@ -43,7 +43,7 @@ describe("Astra Desktop navigation", () => {
     ["runtimes", "เชื่อม agent ที่คุณรันอยู่แล้ว"],
     ["themes", "ออฟฟิศ"],
     ["remote", "Secure remote control"],
-    ["chat", "ASTRA · CEO"],
+    ["chat", "ห้องแชทรวม"],
   ] as const)(
     "renders the %s page without the other sections",
     (page, heading) => {

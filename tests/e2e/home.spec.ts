@@ -78,6 +78,10 @@ test("home: 3D stage, project detail and CEO order via fixture IPC", async ({
           });
           return workflow;
         }
+        if (cmd === "create_task") {
+          const input = args.input as Record<string, unknown>;
+          return { ...input, id: "task-direct", status: "draft" };
+        }
         if (cmd === "execution_events") return [];
         throw Error(`Unexpected fixture command ${cmd}`);
       },
@@ -86,14 +90,14 @@ test("home: 3D stage, project detail and CEO order via fixture IPC", async ({
   await page.goto("/");
   await expect(page.locator(".home-stage")).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "ASTRA · CEO" }),
+    page.getByRole("heading", { name: "ห้องแชทรวม" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "ดูรายละเอียด HOME FIXTURE" }).click();
   await expect(
     page.getByRole("heading", { name: "HOME FIXTURE", exact: true }),
   ).toBeVisible();
-  await page.getByLabel("ข้อความถึง CEO").fill("FIXTURE ORDER");
-  await page.getByLabel("ข้อความถึง CEO").press("Enter");
+  await page.getByLabel("ข้อความในห้องแชทรวม").fill("FIXTURE ORDER");
+  await page.getByLabel("ข้อความในห้องแชทรวม").press("Enter");
   await expect(page.getByText("รับงานแล้วครับ — HOME FIXTURE")).toBeVisible();
   await expect(
     page.getByText("วางแผน (ASTRA)", { exact: false }).first(),
@@ -103,6 +107,15 @@ test("home: 3D stage, project detail and CEO order via fixture IPC", async ({
       () => (globalThis as unknown as { calls: string[] }).calls,
     ),
   ).toContain("create_workflow");
+  await page.getByLabel("ข้อความในห้องแชทรวม").fill("@mira ช่วยดูหน้า login");
+  await page.getByLabel("ข้อความในห้องแชทรวม").press("Enter");
+  await expect(page.getByText("MIRA ได้รับข้อความแล้ว")).toBeVisible();
+  await expect(page.getByText("ถึง MIRA")).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => (globalThis as unknown as { calls: string[] }).calls,
+    ),
+  ).toContain("create_task");
   await page.getByRole("link", { name: "ภาพรวม" }).click();
   await expect(page).toHaveURL(/view=console/);
   await page.getByRole("link", { name: /คิวงาน/ }).click();
@@ -117,15 +130,15 @@ test("home preview without Desktop keeps chat disabled", async ({ page }) => {
   await expect(
     page.getByText("Browser preview · Desktop required"),
   ).toBeVisible();
-  await expect(page.getByLabel("ข้อความถึง CEO")).toBeDisabled();
+  await expect(page.getByLabel("ข้อความในห้องแชทรวม")).toBeDisabled();
   await page.setViewportSize({ width: 375, height: 812 });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await page.getByRole("link", { name: "แชท CEO" }).click();
+  await page.getByRole("link", { name: "แชทรวม" }).click();
   await expect(page).toHaveURL(/view=chat/);
-  await expect(page.getByLabel("ข้อความถึง CEO")).toBeDisabled();
+  await expect(page.getByLabel("ข้อความในห้องแชทรวม")).toBeDisabled();
   await expect(page.locator(".home-stage")).toHaveCount(0);
 });

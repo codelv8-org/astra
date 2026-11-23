@@ -7,6 +7,7 @@ import type {
 } from "../../../../packages/shared/src";
 import type { SceneAgent, SceneStatus } from "./OfficeScene";
 import type { GenSpec } from "./genui/spec";
+import genuiPrompt from "../../../../packages/desktop-core/src/genui_prompt.txt?raw";
 
 /**
  * ตรรกะ CEO (ASTRA) บนหน้า Home
@@ -52,6 +53,8 @@ export interface ChatMessage {
   id: string;
   from: "owner" | "ceo" | "agent";
   agentId?: string;
+  /** ผู้รับของข้อความจากเจ้าของ (agent id) ไม่มี = ทั้งทีม */
+  to?: string;
   text: string;
   at: string;
   /** core = รายงานจากสถานะ Core, model = ผลจาก runtime จริง, mock = Mock Adapter */
@@ -380,11 +383,43 @@ export function agentResultCandidates(
     const task = tasks.get(execution.taskId);
     return task &&
       !task.gate &&
-      task.agentId === execution.agentId &&
-      (task.workflowId || task.agentId === "astra")
+      task.agentId === execution.agentId
       ? [{ task, execution }]
       : [];
   });
+}
+
+/** "@ชื่อ ข้อความ" ส่งตรงถึง agent คนนั้น ถ้าไม่มี mention ใช้ผู้รับที่เลือกไว้ ("" = ทั้งทีม) */
+export function chatTarget(text: string, agents: Agent[], selected: string) {
+  const match = /^@(\S+)\s+([\s\S]+)$/.exec(text.trim());
+  const name = match?.[1].toLowerCase();
+  const agent = agents.find(
+    (item) => item.id.toLowerCase() === name || item.name.toLowerCase() === name,
+  );
+  return match && agent
+    ? { agentId: agent.id, text: match[2].trim() }
+    : { agentId: selected, text: text.trim() };
+}
+
+/** งานเดี่ยวจากห้องแชทรวม: ยังต้องให้ผู้ใช้อนุมัติก่อนรันเหมือนงานในคิว */
+export function directTaskInput(
+  agent: Agent,
+  projectId: string,
+  text: string,
+  mock: boolean,
+) {
+  return {
+    projectId,
+    agentId: agent.id,
+    adapter: mock ? ("mock" as const) : agent.runtimeAdapter,
+    title: `${agent.name} — แชท`,
+    prompt: `Message from the owner in the team chat room (reply to the owner directly, in their language):
+${text}${mock ? "" : genuiPrompt}`,
+    dependencies: [],
+    priority: 50,
+    timeoutSeconds: agent.executionSettings.timeoutSeconds || 300,
+    retryLimit: 2,
+  };
 }
 
 export function clip(text: string, length: number) {

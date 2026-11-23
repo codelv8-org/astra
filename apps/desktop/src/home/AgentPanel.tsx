@@ -31,6 +31,7 @@ export function AgentPanel({
   onClose,
   onOpenQueue,
   onOpenResult,
+  onChat,
 }: {
   agent: Agent;
   state: SceneAgent | undefined;
@@ -38,6 +39,7 @@ export function AgentPanel({
   onClose: () => void;
   onOpenQueue: () => void;
   onOpenResult: (executionId: string, projectId: string) => void;
+  onChat?: () => void;
 }) {
   const [tab, setTab] = useState<(typeof tabs)[number][0]>("activity");
   const status = state?.status ?? "idle";
@@ -81,6 +83,11 @@ export function AgentPanel({
             {runtimeNames[agent.runtimeAdapter] ?? agent.runtimeAdapter}
           </p>
         </div>
+        {onChat && (
+          <button type="button" className="quiet" onClick={onChat}>
+            แชทกับ {agent.name}
+          </button>
+        )}
         <button
           type="button"
           className="icon quiet"
@@ -161,8 +168,7 @@ export function AgentPanel({
               </div>
             ) : (
               <p className="hint">
-                ยังไม่มีงานที่มอบให้ {agent.name} สั่งงานผ่านแชท CEO
-                แล้วงานจะส่งต่อมาตามลำดับ
+                ยังไม่มีงานที่มอบให้ {agent.name} คุยหรือสั่งงานได้ในแชทรวม
               </p>
             )}
 

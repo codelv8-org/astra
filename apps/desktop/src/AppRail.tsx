@@ -8,7 +8,7 @@ type RailEntry = { page: DesktopPage; label: string; icon: IconName };
 /** ลำดับตามงานของผู้ใช้: ดูทีม → สั่งงาน → ติดตาม → ตั้งค่า */
 export const railEntries: RailEntry[] = [
   { page: "home", label: "Home", icon: "map" },
-  { page: "chat", label: "แชท CEO", icon: "chat" },
+  { page: "chat", label: "แชทรวม", icon: "chat" },
   { page: "overview", label: "ภาพรวม", icon: "grid" },
   { page: "tasks", label: "คิวงาน", icon: "queue" },
   { page: "projects", label: "โปรเจกต์", icon: "folder" },

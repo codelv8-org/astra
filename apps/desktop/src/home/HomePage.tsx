@@ -31,6 +31,8 @@ import {
   agentName,
   agentResultCandidates,
   changeReports,
+  chatTarget,
+  directTaskInput,
   diffTasks,
   handoffRoute,
   handoffStatus,
@@ -173,6 +175,8 @@ export function HomePage({
   const [stored, setStored] = useState<Stored>(load);
   const [draft, setDraft] = useState("");
   const [mock, setMock] = useState(false);
+  const [to, setTo] = useState("");
+  const [expanded, setExpanded] = useState<ChatMessage | null>(null);
   const [busy, setBusy] = useState(false);
   const [chatError, setChatError] = useState("");
   const [preview, setPreview] = useState<ExecutionResultRef | null>(null);
@@ -360,10 +364,12 @@ export function HomePage({
 
   async function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const text = draft.trim();
-    if (!text || busy) return;
+    if (!draft.trim() || busy) return;
+    const target = chatTarget(draft, data.agents, to);
+    const text = target.text;
+    const agent = data.agents.find((item) => item.id === target.agentId);
     setChatError("");
-    if (isProgressQuery(text)) {
+    if (!agent && isProgressQuery(text)) {
       append([
         { from: "owner", text },
         {
@@ -381,6 +387,31 @@ export function HomePage({
       return;
     }
     setBusy(true);
+    if (agent) {
+      try {
+        await bridge.createTask(
+          directTaskInput(agent, chatProject, text, mock),
+        );
+        await onRefresh();
+        setDraft("");
+        append([
+          { from: "owner", to: agent.id, text, projectId: chatProject },
+          {
+            from: agent.id === "astra" ? "ceo" : "agent",
+            agentId: agent.id,
+            source: "core",
+            projectId: chatProject,
+            link: "queue",
+            text: `${agent.name} ได้รับข้อความแล้ว กดอนุมัติในแถบด้านบนเพื่อให้เริ่มตอบ${mock ? " (Mock · ไม่มี AI model)" : ""}`,
+          },
+        ]);
+      } catch (cause) {
+        setChatError(cause instanceof Error ? cause.message : String(cause));
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     try {
       const workflow = await bridge.createWorkflow(chatProject, text, mock);
       // ใช้ snapshot ล่าสุดหลังสร้าง เพื่อรายงานขั้นตอนที่ Core สร้างจริง
@@ -501,23 +532,28 @@ export function HomePage({
       className="drawer-panel home-chat"
       id="home-chat"
       tabIndex={-1}
-      aria-label="แชทกับ CEO"
+      aria-label="ห้องแชทรวม"
     >
       <header className="drawer-head">
-        <img
-          className="agent-avatar"
-          data-agent="astra"
-          src="/crewbots/astra/portrait.svg"
-          alt=""
-          width="48"
-          height="48"
-        />
+        <span className="room-avatars" aria-hidden="true">
+          {data.agents.map((agent) => (
+            <img
+              key={agent.id}
+              className="agent-avatar"
+              data-agent={agent.characterKey}
+              src={`/crewbots/${agent.characterKey}/portrait.svg`}
+              alt=""
+              width="32"
+              height="32"
+            />
+          ))}
+        </span>
         <div className="drawer-title">
-          <h2>ASTRA · CEO</h2>
+          <h2>ห้องแชทรวม</h2>
           <p>
             {chatWorkflow
               ? `การส่งต่องาน · ${chatWorkflow.id.slice(0, 8)} · ${flowTone[1]}`
-              : "รับงาน ส่งต่อ และรายงานผลจากทีม"}
+              : `${data.agents.length} agent · คุยกับทั้งทีม หรือพิมพ์ @ชื่อ เพื่อคุยตรง`}
           </p>
         </div>
         {!chatOnly && (
@@ -571,13 +607,32 @@ export function HomePage({
           {stored.messages.map((message) => {
             const resultRef = native && chatExecutionRef(message);
             const speaker = message.agentId ?? "astra";
+            const character =
+              data.agents.find((agent) => agent.id === speaker)
+                ?.characterKey ?? speaker;
             return (
               <li
                 key={message.id}
                 className={`bubble ${message.from}${message.genUI ? " has-genui" : ""}`}
               >
+                {message.from === "owner" && (
+                  <span className="bubble-meta">
+                    ถึง{" "}
+                    {message.to
+                      ? agentName(data.agents, message.to)
+                      : "ทั้งทีม"}
+                  </span>
+                )}
                 {message.from !== "owner" && (
                   <span className="bubble-meta">
+                    <img
+                      className="agent-avatar"
+                      data-agent={character}
+                      src={`/crewbots/${character}/portrait.svg`}
+                      alt=""
+                      width="20"
+                      height="20"
+                    />
                     {agentName(data.agents, speaker)} ·{" "}
                     {message.runtime ?? "สถานะจาก Core"}
                     {message.workflowId &&
@@ -604,6 +659,15 @@ export function HomePage({
                       ดูผลการรัน
                     </button>
                   )}
+                  {message.genUI && (
+                    <button
+                      type="button"
+                      className="link"
+                      onClick={() => setExpanded(message)}
+                    >
+                      ขยายเต็มจอ
+                    </button>
+                  )}
                   {message.link === "queue" && (
                     <button
                       className="link"
@@ -622,7 +686,7 @@ export function HomePage({
                 <p>
                   {native
                     ? "กำลังเชื่อมต่อ Core…"
-                    : "แชทกับ CEO ใช้ได้ใน Astra Desktop เท่านั้น"}
+                    : "แชทรวมใช้ได้ใน Astra Desktop เท่านั้น"}
                 </p>
               </div>
             </li>
@@ -650,6 +714,21 @@ export function HomePage({
               </b>
             </span>
           )}
+          <label className="chat-to">
+            ส่งถึง
+            <select
+              value={to}
+              disabled={!loaded || busy}
+              onChange={(event) => setTo(event.target.value)}
+            >
+              <option value="">ทั้งทีม (ASTRA แตกงาน)</option>
+              {data.agents.map((agent) => (
+                <option key={agent.id} value={agent.id}>
+                  {agent.name} · {agent.role}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="mock-toggle">
             <input
               type="checkbox"
@@ -667,7 +746,7 @@ export function HomePage({
         )}
         <div className="chat-compose">
           <label className="sr-only" htmlFor="ceo-input">
-            ข้อความถึง CEO
+            ข้อความในห้องแชทรวม
           </label>
           <textarea
             id="ceo-input"
@@ -675,7 +754,7 @@ export function HomePage({
             maxLength={4000}
             value={draft}
             disabled={!loaded || busy}
-            placeholder="ข้อความ เช่น “เพิ่มหน้าตั้งค่าโปรไฟล์” หรือพิมพ์ “สถานะ”"
+            placeholder="ข้อความ เช่น “เพิ่มหน้าตั้งค่าโปรไฟล์”, “@mira ช่วยดูหน้า login” หรือ “สถานะ”"
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
               if (
@@ -699,17 +778,36 @@ export function HomePage({
     </section>
   );
 
-  const previewModal = preview && (
-    <Modal title="ผลการรันที่บันทึกไว้" onClose={() => setPreview(null)}>
-      <ExecutionResultView {...preview} agents={data.agents} />
-    </Modal>
+  const previewModal = (
+    <>
+      {preview && (
+        <Modal title="ผลการรันที่บันทึกไว้" onClose={() => setPreview(null)}>
+          <ExecutionResultView {...preview} agents={data.agents} />
+        </Modal>
+      )}
+      {expanded?.genUI && (
+        <Modal
+          title={`${agentName(data.agents, expanded.agentId ?? "astra")} · ผลลัพธ์`}
+          onClose={() => setExpanded(null)}
+        >
+          {expanded.text && <p className="genui-full-text">{expanded.text}</p>}
+          <GenUI
+            spec={expanded.genUI}
+            onDraft={(text) => {
+              setExpanded(null);
+              draftFromGenUI(text, expanded.projectId);
+            }}
+          />
+        </Modal>
+      )}
+    </>
   );
 
   if (chatOnly)
     return (
       <main className="home home-chat-page" id="chat" tabIndex={-1}>
         <header className="page-head">
-          <h1>แชท CEO</h1>
+          <h1>แชทรวม</h1>
           <span className="chip" data-tone={native ? "ok" : "wait"}>
             <span className="dot" />
             {native
@@ -902,6 +1000,12 @@ export function HomePage({
               state={agentStates.find((item) => item.id === focusedAgent.id)}
               data={data}
               onClose={() => selectAgent(null)}
+              onChat={() => {
+                setTo(focusedAgent.id);
+                setFocused(null);
+                scene.current?.setFocus(null);
+                openNewGoal();
+              }}
               onOpenQueue={() => onOpenPage("tasks")}
               onOpenResult={(executionId, projectId) =>
                 setPreview({ executionId, projectId })

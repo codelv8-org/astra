@@ -1057,3 +1057,47 @@ button.link.back {
     height: max(560px, 76dvh);
   }
 }
+
+/* ---- ห้องแชทรวม ---- */
+.room-avatars {
+  display: flex;
+  flex: 0 0 auto;
+  padding-left: 8px;
+}
+.room-avatars .agent-avatar {
+  width: 32px;
+  height: 32px;
+  margin-left: -8px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--panel, var(--well));
+}
+.bubble-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.bubble-meta .agent-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+}
+.bubble.has-genui {
+  width: 100%;
+  max-width: 100%;
+}
+.chat-to {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: var(--t-xs);
+}
+.chat-to select {
+  min-width: 0;
+  max-width: 180px;
+}
+.genui-full-text {
+  margin: 0 0 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
