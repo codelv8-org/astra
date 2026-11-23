@@ -1,0 +1,124 @@
+/* หน้า Themes: โลกของฉาก Home */
+.themes {
+  display: grid;
+  gap: 32px;
+  min-width: 0;
+}
+.world-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+}
+.theme-hero {
+  position: relative;
+  min-height: 300px;
+  overflow: hidden;
+  border-radius: var(--r-tile);
+  background: var(--canvas, var(--well));
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+.theme-hero > .world-image {
+  position: absolute;
+  inset: 0;
+}
+.theme-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgb(12 10 9 / 0.86) 0 36%, rgb(12 10 9 / 0.25));
+  pointer-events: none;
+}
+.theme-hero-text {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  min-height: 300px;
+  max-width: 520px;
+  padding: 32px;
+  color: #f5f5f4;
+}
+.theme-hero-text h2 {
+  font-size: 40px;
+  line-height: 1.1;
+}
+.theme-hero-meta {
+  color: #d6d3d1;
+}
+.theme-hero .avatar-row {
+  margin-top: 8px;
+}
+.theme-hero .avatar-row .agent-avatar {
+  width: 32px;
+  height: 32px;
+  box-shadow: 0 0 0 2px rgb(12 10 9 / 0.9);
+}
+.theme-section {
+  display: grid;
+  gap: 8px;
+}
+.theme-section > h2 {
+  font-size: var(--t-lg);
+}
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: 16px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.theme-card {
+  display: grid;
+  grid-template-rows: 180px auto;
+  overflow: hidden;
+  border-radius: var(--r-tile);
+  background: var(--well);
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+.theme-card[data-active="true"] {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.theme-card-image {
+  position: relative;
+  overflow: hidden;
+  background: var(--canvas, var(--tile));
+}
+.theme-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgb(12 10 9 / 0.85);
+  color: #4ade80;
+  font-size: var(--t-xs);
+}
+.theme-card-body {
+  display: grid;
+  gap: 8px;
+  padding: 16px 20px 20px;
+}
+.theme-card-body h3 {
+  font-size: var(--t-md);
+  font-weight: 500;
+}
+.theme-card-body p {
+  color: var(--ink-2);
+  font-size: var(--t-sm);
+}
+.theme-card-body button {
+  justify-self: start;
+  margin-top: 4px;
+}
+@media (max-width: 760px) {
+  .theme-hero-text {
+    padding: 24px;
+  }
+  .theme-hero-text h2 {
+    font-size: var(--t-xl);
+  }
+}

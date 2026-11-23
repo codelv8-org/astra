@@ -41,6 +41,37 @@ pub fn arguments(adapter: &str) -> Vec<&'static str> {
     }
 }
 
+/// path สำหรับส่งให้ CLI ภายนอก: ตัด prefix verbatim `\\?\` ที่ได้จาก canonicalize
+pub fn plain_path(path: &str) -> String {
+    path.trim_start_matches(r"\\?\").to_string()
+}
+
+fn secondary_folders(project: &crate::models::Project) -> Vec<String> {
+    project
+        .folders
+        .iter()
+        .filter(|f| !f.is_primary && f.exists)
+        .map(|f| plain_path(&f.path))
+        .collect()
+}
+
+/// `--add-dir` สำหรับ folder รอง: เฉพาะ claude (codex read-only อ่านได้อยู่แล้ว, antigravity ไม่รองรับ)
+pub fn extra_dir_args(adapter: &str, project: &crate::models::Project) -> Vec<String> {
+    if adapter != "claude" {
+        return Vec::new();
+    }
+    secondary_folders(project)
+        .into_iter()
+        .flat_map(|p| ["--add-dir".to_string(), p])
+        .collect()
+}
+
+/// บรรทัดบอก agent ว่ามี folder รองให้อ่าน; None เมื่อไม่มี
+pub fn folders_context(project: &crate::models::Project) -> Option<String> {
+    let folders = secondary_folders(project);
+    (!folders.is_empty()).then(|| format!("Additional read-only folders: {}", folders.join("; ")))
+}
+
 pub fn input(adapter: &str, prompt: &str) -> String {
     let _ = adapter;
     prompt.into()

@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Modal } from "../../../packages/ui/src/Modal";
 import { ActivityTabs } from "../../../packages/ui/src/Tabs";
+import { AstraMark, ThemeGlyph } from "../../../packages/ui/src/AstraMark";
 import roster from "../../../packages/shared/default-agents.json";
 import type { RemoteSnapshot } from "../../../packages/protocol/src/index";
 type Device = {
@@ -78,6 +79,9 @@ export function App() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [theme, setTheme] = useState(
+    () => document.documentElement.dataset.theme ?? "dark",
+  );
   async function act(fn: () => Promise<unknown>) {
     setBusy(true);
     setError("");
@@ -118,49 +122,65 @@ export function App() {
     setNotice("ส่งคำสั่งแล้ว ตรวจ acknowledgement และสถานะจริงด้านล่าง");
   }
   const header = (
-    <header>
+    <header className="dock glass">
       <a className="brand" href="#main">
-        CrewNest <span>REMOTE CONSOLE</span>
+        <AstraMark />
+        <span>Astra</span>
+        <span className="chip">Remote</span>
       </a>
-      <button
-        onClick={() => {
-          document.documentElement.dataset.theme =
-            document.documentElement.dataset.theme === "dark"
-              ? "light"
-              : "dark";
-        }}
-      >
-        สลับ theme
-      </button>
-      {session.data && (
+      <div className="dock-actions">
         <button
-          onClick={() =>
-            void act(async () => {
-              await api("/logout", {});
-              csrf = "";
-              cache.clear();
-              setDeviceId("");
-              setRun("");
-              setNotice("ออกจากระบบแล้ว");
-            })
-          }
+          className="icon quiet"
+          aria-label="สลับ theme"
+          title="สลับ theme"
+          onClick={() => {
+            const next =
+              document.documentElement.dataset.theme === "dark"
+                ? "light"
+                : "dark";
+            document.documentElement.dataset.theme = next;
+            setTheme(next);
+          }}
         >
-          ออกจากระบบ
+          <ThemeGlyph theme={theme} />
         </button>
-      )}
+        {session.data && (
+          <button
+            onClick={() =>
+              void act(async () => {
+                await api("/logout", {});
+                csrf = "";
+                cache.clear();
+                setDeviceId("");
+                setRun("");
+                setNotice("ออกจากระบบแล้ว");
+              })
+            }
+          >
+            ออกจากระบบ
+          </button>
+        )}
+      </div>
     </header>
   );
   if (!session.data || session.error)
     return (
-      <>
+      <div className="shell">
         {header}
-        <main id="main" className="login">
-          <img src="/crewbots/astra/portrait.svg" alt="ASTRA" width="120" />
-          <p className="eyebrow">SECURE OWNER ACCESS</p>
+        <main
+          id="main"
+          className="login glass"
+          aria-busy={session.isPending || busy}
+        >
+          <img
+            src="/crewbots/astra/portrait.svg"
+            alt="ASTRA"
+            width="88"
+            height="81"
+          />
           <h1>ควบคุมทีมจากระยะไกล</h1>
-          <p>
-            Desktop ต้องเปิดอยู่และเชื่อมต่อ
-            คำสั่งทุกงานยังอยู่ภายใต้นโยบายของเครื่อง
+          <p className="muted">
+            Desktop ต้องเปิดอยู่และเชื่อมต่อ ทุกคำสั่งยังอยู่ภายใต้นโยบายของเครื่อง
           </p>
           <form onSubmit={(e) => void login(e)}>
             <label>
@@ -183,274 +203,351 @@ export function App() {
               />
             </label>
             <button className="primary" disabled={busy}>
-              เข้าสู่ระบบ
+              {busy ? "กำลังเข้าสู่ระบบ…" : "เข้าสู่ระบบ"}
             </button>
           </form>
-          {error && <p role="alert">{error}</p>}
-          {notice && <p role="status">{notice}</p>}
-        </main>
-      </>
-    );
-  return (
-    <>
-      {header}
-      <main id="main">
-        <div className="heading">
-          <div>
-            <p className="eyebrow">LOCAL EXECUTION · REMOTE VISIBILITY</p>
-            <h1>ทีมพร้อม เมื่อเครื่องออนไลน์</h1>
-            <p>งานรันใน Windows Desktop; ไม่มี remote terminal</p>
-          </div>
-          <button
-            className="primary"
-            disabled={busy}
-            onClick={() =>
-              void act(async () => {
-                const p = await api<{ code: string }>("/pairings", {});
-                setCode(p.code);
-                setModal("pair");
-              })
-            }
-          >
-            จับคู่อุปกรณ์
-          </button>
-        </div>
-        {error && <p role="alert">{error}</p>}
-        {notice && <p role="status">{notice}</p>}
-        {devices.error && <p role="alert">{devices.error.message}</p>}
-        <section aria-label="Windows devices" className="device-grid">
-          {devices.data?.map((d) => (
-            <button
-              key={d.id}
-              className={`device ${deviceId === d.id ? "selected" : ""}`}
-              onClick={() => {
-                setDeviceId(d.id);
-                setRun("");
-                setNotice("");
-              }}
-            >
-              <span className={`dot ${d.online ? "on" : ""}`} />
-              <strong>{d.name}</strong>
-              <span>
-                {d.revoked ? "Revoked" : d.online ? "Online" : "Offline"}
-              </span>
-              <small>
-                Last seen:{" "}
-                {d.lastSeen
-                  ? new Date(d.lastSeen).toLocaleString("th-TH")
-                  : "ยังไม่เชื่อมต่อ"}
-              </small>
-            </button>
-          ))}
-          {!devices.data?.length && (
-            <p className="empty">
-              ยังไม่มีอุปกรณ์ — สร้าง pairing code แล้วกรอกใน CrewNest Desktop
+          {error && (
+            <p role="alert" className="error">
+              {error}
             </p>
           )}
+          {notice && (
+            <p role="status" className="notice">
+              {notice}
+            </p>
+          )}
+        </main>
+      </div>
+    );
+  const executions = snap?.executions ?? [];
+  return (
+    <div className="shell">
+      {header}
+      <main id="main" className="bento">
+        <header className="workspace-heading span-12">
+          <h1>Astra Remote</h1>
+          <p className="muted">
+            เลือกเครื่อง Windows เพื่อดูงานที่แชร์และติดตามผลการรัน
+          </p>
+        </header>
+        {error && (
+          <p role="alert" className="error span-12">
+            {error}
+          </p>
+        )}
+        {notice && (
+          <p role="status" className="notice span-12">
+            {notice}
+          </p>
+        )}
+        {devices.error && (
+          <p role="alert" className="error span-12">
+            {devices.error.message}
+          </p>
+        )}
+        <section aria-label="Windows devices" className="tile span-4">
+          <div className="tile-head">
+            <div>
+              <h2>Devices</h2>
+              <p>งานรันใน Windows Desktop ไม่มี remote terminal</p>
+            </div>
+            <button
+              className="primary"
+              disabled={busy}
+              onClick={() =>
+                void act(async () => {
+                  const p = await api<{ code: string }>("/pairings", {});
+                  setCode(p.code);
+                  setModal("pair");
+                })
+              }
+            >
+              จับคู่อุปกรณ์
+            </button>
+          </div>
+          <div className="device-list" aria-busy={devices.isPending}>
+            {devices.data?.map((d) => (
+              <button
+                key={d.id}
+                className={`device ${deviceId === d.id ? "selected" : ""}`}
+                aria-pressed={deviceId === d.id}
+                onClick={() => {
+                  setDeviceId(d.id);
+                  setRun("");
+                  setNotice("");
+                }}
+              >
+                <span
+                  className="chip"
+                  data-tone={d.revoked ? "bad" : d.online ? "ok" : "idle"}
+                >
+                  <span className="dot" />
+                  {d.revoked ? "Revoked" : d.online ? "Online" : "Offline"}
+                </span>
+                <strong>{d.name}</strong>
+                <small>
+                  Last seen:{" "}
+                  {d.lastSeen
+                    ? new Date(d.lastSeen).toLocaleString("th-TH")
+                    : "ยังไม่เชื่อมต่อ"}
+                </small>
+              </button>
+            ))}
+            {devices.isPending && (
+              <p role="status" className="hint">
+                กำลังโหลดอุปกรณ์…
+              </p>
+            )}
+            {devices.isSuccess && !devices.data.length && (
+              <p className="hint">
+                ยังไม่มีอุปกรณ์ สร้าง pairing code แล้วกรอกใน Astra Desktop
+              </p>
+            )}
+          </div>
         </section>
+        {!device && (
+          <section className="tile span-8 placeholder">
+            <img
+              src="/crewbots/astra/portrait.svg"
+              alt=""
+              width="64"
+              height="59"
+            />
+            <div>
+              <h2>เลือกอุปกรณ์เพื่อดูงาน</h2>
+              <p className="hint">
+                สถานะ งาน และ logs แสดงเฉพาะโปรเจกต์ที่เจ้าของแชร์จากเครื่อง
+              </p>
+            </div>
+          </section>
+        )}
         {device && (
           <>
-            <div className="statusbar">
-              <strong>
-                {device.name} · {device.online ? "ONLINE" : "OFFLINE"}
-              </strong>
-              <span>
-                {snap?.schedulerPaused
-                  ? "Scheduling paused"
-                  : "Scheduling active"}
-              </span>
-              <button
-                disabled={!device.online || busy}
-                onClick={() => void act(() => command("status"))}
-              >
-                Refresh status
-              </button>
-              <button
-                disabled={!device.online || busy}
-                onClick={() => void act(() => command("pause_scheduling"))}
-              >
-                Pause scheduling
-              </button>
-              <button
-                disabled={device.revoked || busy}
-                onClick={() => setModal("revoke")}
-              >
-                Revoke device
-              </button>
-            </div>
-            <section className="crew" aria-label="CrewBots">
-              {roster.map((a) => (
-                <article key={a.id}>
-                  <img
-                    src={`/crewbots/${a.characterKey}/portrait.svg`}
-                    alt=""
-                  />
-                  <h2>{a.name}</h2>
-                  <p>{a.role}</p>
-                  <small>{a.runtimeAdapter}</small>
-                </article>
+            <section className="tile span-8 device-status">
+              <div className="tile-head">
+                <div>
+                  <h2>{device.name}</h2>
+                  <p>
+                    {snap?.schedulerPaused
+                      ? "Scheduling paused"
+                      : "Scheduling active"}
+                  </p>
+                </div>
+                <span
+                  className="chip"
+                  data-tone={device.online ? "ok" : "idle"}
+                >
+                  <span className="dot" />
+                  {device.online ? "Online" : "Offline"}
+                </span>
+              </div>
+              <ul className="crew-strip" aria-label="CrewBots">
+                {roster.map((a) => (
+                  <li key={a.id}>
+                    <img
+                      src={`/crewbots/${a.characterKey}/portrait.svg`}
+                      alt=""
+                      width="36"
+                      height="33"
+                    />
+                    <span>
+                      <b>{a.name}</b>
+                      <small>{a.runtimeAdapter}</small>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <div className="tile-actions start">
+                <button
+                  disabled={!device.online || busy}
+                  onClick={() => void act(() => command("status"))}
+                >
+                  Refresh status
+                </button>
+                <button
+                  disabled={!device.online || busy}
+                  onClick={() => void act(() => command("pause_scheduling"))}
+                >
+                  Pause scheduling
+                </button>
+                <button
+                  className="danger"
+                  disabled={device.revoked || busy}
+                  onClick={() => setModal("revoke")}
+                >
+                  Revoke device
+                </button>
+              </div>
+            </section>
+            <section className="tile span-8">
+              <div className="tile-head">
+                <div>
+                  <h2>Projects & tasks</h2>
+                  <p>เฉพาะโปรเจกต์ที่เจ้าของแชร์จากเครื่อง</p>
+                </div>
+                <button
+                  className="primary"
+                  disabled={!device.online || !snap?.projects?.length || busy}
+                  onClick={() => setModal("task")}
+                >
+                  <span className="plus" aria-hidden="true">
+                    ＋
+                  </span>
+                  ส่งงานใหม่
+                </button>
+              </div>
+              {snap?.workflows?.map((w) => (
+                <p key={w.id} className="command">
+                  <strong>Workflow · {w.status}</strong>
+                  <small>
+                    {w.objective} · rework {w.reworkCount}/2
+                  </small>
+                </p>
+              ))}
+              {!snap?.projects?.length && (
+                <p className="hint">ยังไม่มีโปรเจกต์ที่แชร์</p>
+              )}
+              {snap?.projects?.map((p) => (
+                <div key={p.id} className="project">
+                  <h3>{p.name}</h3>
+                  {snap.tasks
+                    ?.filter((t) => t.projectId === p.id)
+                    .map((t) => (
+                      <article className="task" key={t.id}>
+                        <div>
+                          <strong>{t.title}</strong>
+                          <p>
+                            {t.agentId.toUpperCase()} ·{" "}
+                            {t.adapter === "mock" ? "MOCK — no AI" : t.adapter}{" "}
+                            · {t.status}
+                          </p>
+                          <small>
+                            {t.gate
+                              ? "Human gate"
+                              : t.approved
+                                ? "Local approval recorded"
+                                : "Local approval required"}{" "}
+                            · attempts {t.attempts} · dependencies{" "}
+                            {t.dependencies.length}
+                          </small>
+                        </div>
+                        <div className="actions">
+                          <button
+                            disabled={
+                              !device.online ||
+                              !t.approved ||
+                              t.gate ||
+                              t.status !== "queued" ||
+                              busy
+                            }
+                            onClick={() =>
+                              void act(() => command("start", p.id, t.id))
+                            }
+                          >
+                            Start
+                          </button>
+                          <button
+                            disabled={
+                              !device.online ||
+                              ["completed", "canceled"].includes(t.status) ||
+                              busy
+                            }
+                            onClick={() =>
+                              void act(() => command("cancel", p.id, t.id))
+                            }
+                          >
+                            Cancel
+                          </button>
+                          {t.lastExecutionId && (
+                            <button
+                              className="quiet"
+                              onClick={() => setRun(t.lastExecutionId!)}
+                            >
+                              Logs
+                            </button>
+                          )}
+                        </div>
+                      </article>
+                    ))}
+                </div>
               ))}
             </section>
-            <div className="columns">
-              <section className="panel">
-                <div className="heading">
-                  <div>
-                    <h2>Projects & tasks</h2>
-                    <p>เฉพาะโปรเจกต์ที่เจ้าของแชร์จากเครื่อง</p>
-                  </div>
-                  <button
-                    disabled={!device.online || !snap?.projects?.length || busy}
-                    onClick={() => setModal("task")}
-                  >
-                    ＋ ส่งงานใหม่
-                  </button>
-                </div>
-                {snap?.workflows?.map((w) => (
-                  <p key={w.id} className="command">
-                    <strong>Workflow · {w.status}</strong>
-                    <small>
-                      {w.objective} · rework {w.reworkCount}/2
-                    </small>
-                  </p>
-                ))}
-                {!snap?.projects?.length && (
-                  <p className="empty">ยังไม่มีโปรเจกต์ที่แชร์</p>
-                )}
-                {snap?.projects?.map((p) => (
-                  <div key={p.id} className="project">
-                    <h3>{p.name}</h3>
-                    {snap.tasks
-                      ?.filter((t) => t.projectId === p.id)
-                      .map((t) => (
-                        <article className="task" key={t.id}>
-                          <div>
-                            <strong>{t.title}</strong>
-                            <p>
-                              {t.agentId.toUpperCase()} ·{" "}
-                              {t.adapter === "mock"
-                                ? "MOCK — no AI"
-                                : t.adapter}{" "}
-                              · {t.status}
-                            </p>
-                            <small>
-                              {t.gate
-                                ? "Human gate"
-                                : t.approved
-                                  ? "Local approval recorded"
-                                  : "Local approval required"}{" "}
-                              · attempts {t.attempts} · dependencies{" "}
-                              {t.dependencies.length}
-                            </small>
-                          </div>
-                          <div className="actions">
-                            <button
-                              disabled={
-                                !device.online ||
-                                !t.approved ||
-                                t.gate ||
-                                t.status !== "queued" ||
-                                busy
-                              }
-                              onClick={() =>
-                                void act(() => command("start", p.id, t.id))
-                              }
-                            >
-                              Start
-                            </button>
-                            <button
-                              disabled={
-                                !device.online ||
-                                ["completed", "canceled"].includes(t.status) ||
-                                busy
-                              }
-                              onClick={() =>
-                                void act(() => command("cancel", p.id, t.id))
-                              }
-                            >
-                              Cancel
-                            </button>
-                            {t.lastExecutionId && (
-                              <button
-                                onClick={() => setRun(t.lastExecutionId!)}
-                              >
-                                Logs
-                              </button>
-                            )}
-                          </div>
-                        </article>
-                      ))}
-                  </div>
-                ))}
-              </section>
-              <aside className="panel">
+            <aside className="tile span-4 activity">
+              <div className="tile-head">
                 <h2>Execution activity</h2>
-                <ActivityTabs
-                  key={device.id + JSON.stringify(snap?.executions)}
-                  groups={[
-                    {
-                      label: "กำลังรัน",
-                      items: (snap?.executions ?? [])
-                        .filter((e) => e.status === "running")
-                        .map((e) => ({
-                          title: e.agentId.toUpperCase(),
-                          subtitle: e.adapter,
-                          detail: e.status,
-                          color: "#e9ac45",
-                        })),
-                    },
-                    {
-                      label: "เสร็จแล้ว",
-                      items: (snap?.executions ?? [])
-                        .filter((e) => e.status === "completed")
-                        .map((e) => ({
-                          title: e.agentId.toUpperCase(),
-                          subtitle:
-                            e.adapter === "mock" ? "MOCK — no AI" : e.adapter,
-                          detail: e.status,
-                          color: "#59c6a8",
-                        })),
-                    },
-                    {
-                      label: "อื่น ๆ",
-                      items: (snap?.executions ?? [])
-                        .filter(
-                          (e) => !["running", "completed"].includes(e.status),
-                        )
-                        .map((e) => ({
-                          title: e.agentId.toUpperCase(),
-                          subtitle: e.adapter,
-                          detail: e.status,
-                          color: "#bc96e8",
-                        })),
-                    },
-                  ]}
-                />
-                <h2>Command acknowledgements</h2>
-                {commands.data?.map((c) => (
+              </div>
+              <ActivityTabs
+                key={device.id + JSON.stringify(snap?.executions)}
+                groups={[
+                  {
+                    label: "กำลังรัน",
+                    items: executions
+                      .filter((e) => e.status === "running")
+                      .map((e) => ({
+                        title: e.agentId.toUpperCase(),
+                        subtitle: e.adapter,
+                        detail: e.status,
+                        color: "var(--run)",
+                      })),
+                  },
+                  {
+                    label: "เสร็จแล้ว",
+                    items: executions
+                      .filter((e) => e.status === "completed")
+                      .map((e) => ({
+                        title: e.agentId.toUpperCase(),
+                        subtitle:
+                          e.adapter === "mock" ? "MOCK — no AI" : e.adapter,
+                        detail: e.status,
+                        color: "var(--ok)",
+                      })),
+                  },
+                  {
+                    label: "อื่น ๆ",
+                    items: executions
+                      .filter(
+                        (e) => !["running", "completed"].includes(e.status),
+                      )
+                      .map((e) => ({
+                        title: e.agentId.toUpperCase(),
+                        subtitle: e.adapter,
+                        detail: e.status,
+                        color: "var(--c-mira)",
+                      })),
+                  },
+                ]}
+              />
+              <h3 className="sub">Command acknowledgements</h3>
+              {commands.data?.length ? (
+                commands.data.map((c) => (
                   <p key={c.id} className="command">
                     <strong>
                       {c.envelope.action} · {c.state}
                     </strong>
                     <small>{c.result?.detail ?? c.id.slice(0, 8)}</small>
                   </p>
-                ))}
-              </aside>
-            </div>
-            <section className="panel">
-              <h2>Sanitized execution logs</h2>
-              <label>
-                Execution
-                <select value={run} onChange={(e) => setRun(e.target.value)}>
-                  <option value="">เลือก execution</option>
-                  {snap?.executions?.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.agentId} · {e.adapter} · {e.status} ·{" "}
-                      {e.id.slice(0, 8)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div role="log" className="logs">
+                ))
+              ) : (
+                <p className="hint">ยังไม่มีคำสั่ง</p>
+              )}
+            </aside>
+            <section className="tile span-12">
+              <div className="tile-head">
+                <h2>Sanitized execution logs</h2>
+                <label className="inline-select">
+                  Execution
+                  <select value={run} onChange={(e) => setRun(e.target.value)}>
+                    <option value="">เลือก execution</option>
+                    {executions.map((e) => (
+                      <option key={e.id} value={e.id}>
+                        {e.agentId} · {e.adapter} · {e.status} ·{" "}
+                        {e.id.slice(0, 8)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div role="log" className="logs well">
                 {logs.data?.map((e) => (
                   <div key={e.id}>
                     <small>{e.kind}</small>
@@ -458,7 +555,9 @@ export function App() {
                   </div>
                 ))}
                 {!logs.data?.length && (
-                  <p>ยังไม่มี logs ที่อนุญาตให้แชร์ ไม่แทนด้วยข้อมูล demo</p>
+                  <p className="hint">
+                    ยังไม่มี logs ที่อนุญาตให้แชร์ ไม่แทนด้วยข้อมูล demo
+                  </p>
                 )}
               </div>
             </section>
@@ -503,6 +602,7 @@ export function App() {
                 commands; local execution ที่เริ่มแล้วอาจยังทำงานต่อ
               </p>
               <button
+                className="danger"
                 disabled={busy}
                 onClick={() =>
                   void act(async () => {
@@ -573,7 +673,7 @@ export function App() {
                 Task prompt
                 <textarea name="prompt" required maxLength={4000} rows={5} />
               </label>
-              <p>
+              <p className="hint">
                 ส่งเป็น draft เท่านั้น ต้องอนุมัติ exact prompt ในเครื่องก่อน
                 Start ไม่ให้สิทธิ์ shell/write/approval ใหม่
               </p>
@@ -584,6 +684,6 @@ export function App() {
           )}
         </Modal>
       )}
-    </>
+    </div>
   );
 }

@@ -51,6 +51,37 @@ export interface Project {
   path: string;
   isGit: boolean;
   createdAt: string;
+  /** source folders; ตัวที่ isPrimary ตรงกับ path */
+  folders?: ProjectFolder[];
+}
+export interface ProjectFolder {
+  id: string;
+  path: string;
+  repoRoot: string | null;
+  isGit: boolean;
+  isPrimary: boolean;
+  position: number;
+  exists: boolean;
+}
+export interface StorageInfo {
+  dataDir: string;
+  mode: "local" | "network";
+  dbBytes: number;
+  freeBytes: number;
+  previous: string | null;
+}
+export interface StorageStatus {
+  status: "ok" | "error";
+  error: string | null;
+  info: StorageInfo | null;
+  /** ตำแหน่งก่อนหน้า (มีแม้ในโหมดกู้คืน) */
+  previous: string | null;
+}
+export interface FolderInspection {
+  path: string;
+  repoRoot: string | null;
+  isGit: boolean;
+  warning: string | null;
 }
 export interface Execution {
   id: string;
@@ -99,6 +130,7 @@ export interface Snapshot {
     | "connected"
     | "connecting"
     | "disconnected"
+    | "pairing_required"
     | "offline";
 }
 
@@ -137,4 +169,6 @@ export interface TaskEvent {
   kind: string;
   text: string;
   createdAt: string;
+  initiator: string;
+  initiatorRef?: string | null;
 }

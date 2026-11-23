@@ -3,6 +3,8 @@ packages:
   - packages/*
 allowBuilds:
   esbuild: true
+overrides:
+  '@fastify/websocket>ws': 8.21.1
 minimumReleaseAgeExclude:
   - '@tauri-apps/api@2.12.5'
   - '@tauri-apps/cli-darwin-arm64@2.12.5'

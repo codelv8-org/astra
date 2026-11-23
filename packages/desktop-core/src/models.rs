@@ -9,6 +9,19 @@ pub struct Project {
     pub path: String,
     pub is_git: bool,
     pub created_at: String,
+    pub folders: Vec<ProjectFolder>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectFolder {
+    pub id: String,
+    pub path: String,
+    pub repo_root: Option<String>,
+    pub is_git: bool,
+    pub is_primary: bool,
+    pub position: i64,
+    pub exists: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -36,6 +49,44 @@ pub struct ExecutionEvent {
     pub kind: String,
     pub text: String,
     pub created_at: String,
+}
+
+/// Who caused a task event; every writer must name one (no default).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Initiator {
+    Owner,
+    Remote(String),
+    Scheduler,
+    Handoff(String),
+    System,
+}
+
+impl Initiator {
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Self::Owner => "owner",
+            Self::Remote(_) => "remote",
+            Self::Scheduler => "scheduler",
+            Self::Handoff(_) => "handoff",
+            Self::System => "system",
+        }
+    }
+    pub fn reference(&self) -> Option<&str> {
+        match self {
+            Self::Remote(r) | Self::Handoff(r) => Some(r),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecutionResult {
+    pub execution_id: String,
+    pub project_id: String,
+    pub agent_id: String,
+    pub adapter: String,
+    pub event: Option<ExecutionEvent>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -138,4 +189,6 @@ pub struct TaskEvent {
     pub kind: String,
     pub text: String,
     pub created_at: String,
+    pub initiator: String,
+    pub initiator_ref: Option<String>,
 }

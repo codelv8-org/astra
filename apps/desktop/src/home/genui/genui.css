@@ -1,0 +1,219 @@
+.genui {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  margin-block: 8px;
+  color: var(--ink);
+}
+.genui-block {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--hair);
+  border-radius: 12px;
+  background: var(--surface, var(--tile-solid));
+  overflow-wrap: anywhere;
+}
+.genui-block h3 {
+  margin: 0;
+  font-size: var(--t-sm);
+}
+.genui-block p,
+.genui-block dd,
+.genui-block dl,
+.genui-block pre {
+  margin: 0;
+}
+.genui-block[data-tone="info"] {
+  border-inline-start: 3px solid var(--accent);
+}
+.genui-block[data-tone="success"] {
+  border-inline-start: 3px solid var(--ok);
+}
+.genui-block[data-tone="warning"] {
+  border-inline-start: 3px solid var(--wait);
+}
+.genui-block[data-tone="error"] {
+  border-inline-start: 3px solid var(--bad);
+}
+.genui-block button {
+  min-height: 32px;
+  height: auto;
+  padding: 4px 8px;
+  font-size: var(--t-xs);
+  white-space: normal;
+}
+.genui-block :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.genui-block :is(input:not([type="checkbox"]), select) {
+  width: 100%;
+  min-width: 0;
+}
+.genui-block label {
+  min-width: 0;
+}
+.genui-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 8px;
+}
+.genui-controls [aria-selected="true"] {
+  border-color: var(--accent);
+  box-shadow: inset 0 -2px var(--accent);
+}
+.genui-block [role="tabpanel"] > .genui-block + .genui-block {
+  margin-top: 6px;
+}
+.genui-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 92px), 1fr));
+  gap: 6px;
+}
+.genui-kpis > div {
+  border: 1px solid var(--hair);
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+.genui-kpis dd {
+  font-size: 1.35em;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.genui-kpis small {
+  display: block;
+  font-weight: 400;
+}
+.genui-table-scroll,
+.genui-block pre {
+  max-width: 100%;
+  overflow: auto;
+}
+.genui-block pre {
+  max-height: 200px;
+  padding: 6px;
+}
+.genui-block table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: start;
+}
+.genui-block :is(th, td) {
+  text-align: start;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--hair);
+  min-width: 74px;
+}
+.genui-block th button {
+  width: 100%;
+  text-align: start;
+}
+.genui-trend {
+  display: block;
+  width: 100%;
+}
+.genui-round-chart {
+  display: block;
+  width: min(55%, 112px);
+  margin-inline: auto;
+}
+.genui-track {
+  fill: var(--hair);
+}
+.genui-fill {
+  fill: var(--accent);
+}
+.genui-area {
+  opacity: 0.25;
+}
+.genui-line {
+  stroke: var(--accent);
+  stroke-width: 2;
+  fill: none;
+}
+.genui-axis {
+  stroke: var(--ink-2);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+.genui-block :is(ul, ol) {
+  display: grid;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  gap: 6px;
+}
+.genui-bar-list li,
+.genui-values > div {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 2px 6px;
+}
+.genui-bar-list svg {
+  display: block;
+  width: 100%;
+  height: 6px;
+}
+.genui-values dt {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.genui-values dt svg {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+}
+.genui-timeline li {
+  border-inline-start: 2px solid var(--hair);
+  padding-inline-start: 8px;
+}
+.genui-timeline li[data-status="active"] {
+  border-color: var(--accent);
+}
+.genui-timeline li[data-status="done"] {
+  border-color: var(--ok);
+}
+.genui-timeline li[data-status="failed"] {
+  border-color: var(--bad);
+}
+.genui-timeline span {
+  display: block;
+  color: var(--ink-2);
+}
+.genui-checklist label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.genui-checklist input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+}
+.genui-calculator {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: end;
+  gap: 6px;
+}
+.genui-calculator > span {
+  align-self: end;
+  padding-bottom: 8px;
+}
+.genui-block output {
+  font-weight: 700;
+}
+.genui-block summary {
+  cursor: pointer;
+}
+.home .bubble.has-genui {
+  width: 100%;
+  max-width: 100%;
+}

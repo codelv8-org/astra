@@ -1,4 +1,4 @@
-use crate::{store::Store, Result};
+use crate::{models::Initiator, store::Store, Result};
 use rusqlite::{params, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -31,6 +31,14 @@ pub struct WritingPatch {
     pub state: String,
     pub before: Vec<FileSnapshot>,
     pub files: Vec<FileChange>,
+}
+
+impl WritingPatch {
+    pub fn digest(&self) -> Result<String> {
+        serde_json::to_string(self)
+            .map(|serialized| hash(&serialized))
+            .map_err(|e| e.to_string())
+    }
 }
 
 fn hash(text: &str) -> String {
@@ -191,6 +199,7 @@ impl Store {
             id,
             "writing_configured",
             "Human selected exact source paths; content requires a separate approval before apply",
+            &Initiator::Owner,
         )
     }
     pub fn writing_context(&self, id: &str) -> Result<Option<String>> {
@@ -270,13 +279,10 @@ impl Store {
                 files: proposal.files,
             },
         )?;
-        self.task_event(id,"patch_staged","FORGE output staged; files unchanged until human reviews exact content and approves apply")
+        self.task_event(id,"patch_staged","FORGE output staged; files unchanged until human reviews exact content and approves apply", &Initiator::System)
     }
     pub fn patch_digest(&self, id: &str) -> Result<String> {
-        Ok(hash(
-            &serde_json::to_string(&self.patch(id)?.ok_or("No staged patch")?)
-                .map_err(|e| e.to_string())?,
-        ))
+        self.patch(id)?.ok_or("No staged patch")?.digest()
     }
     pub fn apply_patch(&self, id: &str, digest: &str) -> Result<()> {
         let _guard = self.queue_lock.lock();
@@ -322,7 +328,7 @@ impl Store {
             let result =
                 checked_path(&root, &file.path).and_then(|path| write(&path, &file.content));
             if let Err(error) = result {
-                self.task_event(id, "patch_recovery_required", &error)?;
+                self.task_event(id, "patch_recovery_required", &error, &Initiator::System)?;
                 return Err(
                     "Apply interrupted; journal retained. Review and rollback before continuing"
                         .into(),
@@ -340,6 +346,7 @@ impl Store {
             &format!(
                 "Human approved exact patch {digest}; original contents retained in local journal"
             ),
+            &Initiator::Owner,
         )?;
         self.audit("patch_applied", &format!("{id}:{digest}"))?;
         self.reconcile_queue()
@@ -407,6 +414,7 @@ impl Store {
             id,
             "patch_rolled_back",
             "Human approved journal rollback; dependencies blocked",
+            &Initiator::Owner,
         )?;
         self.audit("patch_rolled_back", &format!("{id}:{digest}"))?;
         self.reconcile_queue()

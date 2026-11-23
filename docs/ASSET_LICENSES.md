@@ -35,6 +35,14 @@
 | Lucian tokens | `assets/lucian-tokens.css`; map สีเข้ากับ CrewNest light/dark, ใช้ LINE Seed Sans TH; full MIT notice อยู่ `assets/licenses/LUCIAN_MIT_LICENSE.txt` |
 | App icon | เขียน geometry ต้นฉบับใน `assets/app-icon.svg`; PNG/ICO/ICNS/platform sizes สร้างด้วย Tauri CLI icon generator ใน apps/desktop/src-tauri/icons ไม่ใช่ artwork ภายนอก |
 
+## Assets ที่เพิ่มกับ Guildhall skin (2026-11-21)
+
+| รายการ | ที่มา / สิทธิ์ / การปรับ |
+|---|---|
+| IBM Plex Sans Thai WOFF2 400/500/600 (subset thai, latin, latin-ext) | © 2019 IBM Corp.; SIL OFL 1.1; ได้จาก npm `@fontsource/ibm-plex-sans-thai@5.3.0` (Fontsource จัด subset จากไฟล์ทางการของ [IBM/plex](https://github.com/IBM/plex)) วันที่ 2026-11-21; ไม่มีการแก้ font; ใช้เฉพาะเมื่อ `data-skin="guildhall"` ผ่าน `packages/ui/src/guildhall.css` |
+| Font provenance | รายไฟล์และ SHA-256 อยู่ `assets/fonts/provenance.json`; full OFL พร้อม copyright notice ต้นฉบับอยู่ `assets/licenses/IBM_PLEX_SANS_THAI_OFL.txt` |
+| ไอคอนเส้นใน `packages/ui/src/icons.tsx` | วาด path ใหม่เอง ไม่ได้คัดลอกชุดไอคอนภายนอก |
+
 รักษา font/MIT licenses เป็นข้อความต้นฉบับ ไม่แปลหรือเปลี่ยน attribution ปรับ Lucian เฉพาะข้อมูล/ภาษา/theme, React lifecycle/cleanup และ responsive container โดยรักษาโครงสร้างและ motion หลัก ตรวจ keyboard/light-dark/375px/reduced-motion ผ่าน browser tests; native WebView ยังรอ UAT
 
 ## ก่อน public release

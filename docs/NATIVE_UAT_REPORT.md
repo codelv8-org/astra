@@ -44,3 +44,29 @@ Codex ใช้ synthetic prompts ที่ห้าม tools/files/commands ไ
 Native UAT นี้ปิด gap ของ Phase 1 ตามรายการขอแล้ว ไม่ใช่ human owner final UAT sign-off หรือ full MVP acceptance ยังไม่ตรวจ installer/signing, sleep/forced-kill ทุกกรณี, uninstalled/unauthenticated native environment, writing agents หรือ remote control; process timeout/tree cleanup มี automated fixtures ทดสอบแยก
 
 Read-only sandbox ไม่ใช่ VM isolation; CLI costs/quota เป็นของบัญชีที่ login; Claude/Antigravity execution ยัง unsupported ตาม Phase 1 เปิดแอปค้างไว้พร้อม history และไม่มี active execution ณจบ UAT
+
+## Storage folder บน File Sharing — 2026-11-22
+
+ใช้ข้อมูลทดสอบเท่านั้น ไม่แตะข้อมูลจริงของผู้ใช้ share ที่ใช้: `X:` = `\sg1-ai\AI_Storage` (ผู้ใช้เลือก) ใน folder ทดสอบแยก
+
+Core (`packages/desktop-core/tests/storage_uat.rs`, `#[ignore]`, รันด้วย `CREWNEST_UAT_SHARE`):
+
+| ขั้น | X: (mapped) | `\sg1-ai\AI_Storage` (UNC) |
+|---|---|---|
+| detect_mode = Network | ผ่าน | ผ่าน |
+| migrate local → share (VACUUM INTO + integrity + row count) | 1.4 วิ | 0.3 วิ |
+| journal_mode = delete, ไม่มี `-wal` | ผ่าน | ผ่าน |
+| InstanceLock ซ้อนไม่ได้ / ปล่อยแล้วได้ใหม่ | ผ่าน | ผ่าน |
+| เขียน 200 ครั้งจาก 4 thread, integrity_check ok | 24.7 วิ | 9.6 วิ |
+| migrate share → share, delete_previous ไม่ลบขณะต้นทางถูก lock | ผ่าน | ผ่าน |
+
+Native debug build (`tauri build --debug --no-bundle`, `CREWNEST_DATA_DIR` แยก, อ่านหน้าผ่าน WebView2 CDP):
+
+- ไม่มี storage.json: เปิดได้, DB ในเครื่อง, มีทั้ง `crewnest.lock` และ `crewnest.instance.lock` (ยืนยันการแก้ lock ซ้อนตอนเปิดแอป)
+- storage.json ชี้ X:: Desktop Core connected, หน้าพื้นที่จัดเก็บแสดง Network/ขนาด/พื้นที่ว่าง, บน share ไม่มี `-wal`
+- เปิด instance ที่สองขณะตัวแรกเปิดอยู่: หน้ากู้คืน "ข้อมูลกำลังถูกใช้โดย <host> pid <n>" ไม่เปิด DB ซ้อน
+- storage.json ชี้ path ที่ไม่มี: หน้ากู้คืน ไม่สร้าง folder/DB ใหม่
+- กด "กลับไปใช้ตำแหน่งเดิม" ในหน้ากู้คืน: pointer สลับ, แอปรีสตาร์ทเองและเปิดบน share ได้
+
+ยังไม่ได้ตรวจ: ปุ่ม "เปลี่ยนที่จัดเก็บ…" ผ่าน native folder picker จริง (logic เดียวกับ core migrate และ e2e fixture), share หลุดระหว่างแอปทำงาน, เครื่องที่สองจริงบน network
+ข้อสังเกต: เขียนบน share ครั้งละ ~50–120 ms (เปิด connection ต่อครั้ง + journal DELETE) ข้อความหน้ากู้คืนกรณี lock และ hint หน้าพื้นที่จัดเก็บแก้แล้วหลัง UAT (หัวข้อ "ข้อมูลเปิดอยู่บนเครื่องอื่น" + บอกให้ปิด Astra เครื่องนั้น, hint บอกว่าแอปรีสตาร์ทเอง) มี e2e คุมใน `tests/e2e/storage.spec.ts`

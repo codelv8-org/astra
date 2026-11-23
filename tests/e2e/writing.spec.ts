@@ -77,6 +77,7 @@ test("writing IPC fixture requires content review and exact digest before apply"
                   kind: "patch_applied",
                   text: "FIXTURE ONLY: refreshed without reopening",
                   createdAt: "2026-11-18",
+                  initiator: "owner",
                 },
               ]
             : [];
@@ -91,11 +92,12 @@ test("writing IPC fixture requires content review and exact digest before apply"
       },
     };
   }, agents);
-  await page.goto("/");
+  await page.goto("/?view=console&page=tasks");
   await page.getByRole("button", { name: /FORGE WRITING FIXTURE/ }).click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog.getByText("old source", { exact: true })).toBeVisible();
-  await expect(dialog.getByText("new source", { exact: true })).toBeVisible();
+  const diff = dialog.getByRole("table", { name: "Diff ของ example.mjs" });
+  await expect(diff.getByText(/old source/)).toBeVisible();
+  await expect(diff.getByText(/new source/)).toBeVisible();
   const apply = dialog.getByRole("button", {
     name: "Approve & apply exact patch",
   });

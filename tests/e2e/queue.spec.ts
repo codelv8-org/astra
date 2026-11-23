@@ -67,6 +67,8 @@ test("queue UI fixture: create draft, inspect approval request and pause schedul
               kind: "created",
               text: "FIXTURE ONLY: draft created",
               createdAt: new Date().toISOString(),
+              initiator: "remote",
+              initiatorRef: "dev-1234abcd",
             },
           ];
         if (cmd === "queue_action") {
@@ -81,8 +83,8 @@ test("queue UI fixture: create draft, inspect approval request and pause schedul
       },
     };
   }, agents);
-  await page.goto("/");
-  await page.getByRole("button", { name: "＋ Add task", exact: true }).click();
+  await page.goto("/?view=console&page=tasks");
+  await page.getByRole("button", { name: "Add task", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await dialog
     .getByRole("combobox", { name: "Project", exact: true })
@@ -104,12 +106,13 @@ test("queue UI fixture: create draft, inspect approval request and pause schedul
   await expect(
     page.getByText("FIXTURE ONLY: draft created", { exact: false }),
   ).toBeVisible();
+  await expect(page.getByText("สั่งโดย Remote (อุปกรณ์ dev-1234)")).toBeVisible();
   await dialog
     .getByRole("button", { name: "Review & approve queue task" })
     .click();
   await expect(
     page.getByRole("button", { name: /QUEUE FIXTURE TASK/ }),
-  ).toContainText("queued");
+  ).toContainText("เข้าคิว");
   await page.getByRole("button", { name: "Resume scheduling" }).click();
   await expect(
     page.getByRole("button", { name: "Pause scheduling" }),

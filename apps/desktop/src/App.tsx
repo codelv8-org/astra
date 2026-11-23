@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   type FormEvent,
+  type MouseEvent,
 } from "react";
 import type {
   Agent,
@@ -19,6 +20,28 @@ import { ActivityTabs } from "../../../packages/ui/src/Tabs";
 import { Modal } from "../../../packages/ui/src/Modal";
 import { bridge, desktopAvailable } from "./bridge";
 import { QueueBoard } from "./QueueBoard";
+import { HomePage } from "./home/HomePage";
+import {
+  agentName,
+  displayPath,
+  progressOf,
+  sceneAgents,
+  statusLabels,
+  stepLabels,
+} from "./home/ceo";
+import { AppRail } from "./AppRail";
+import { consolePages, pageHref, readPage, type DesktopPage } from "./pages";
+import { runtimeLabels } from "./ExecutionResultView";
+import { ReviewPage, type ReviewTab } from "./ReviewPage";
+import { JobDesks } from "./JobDesks";
+import { Connectors } from "./Connectors";
+import { ProjectsOverview } from "./ProjectsOverview";
+import { Themes } from "./Themes";
+import { readWorld, saveWorld, type WorldId } from "./home/worlds";
+import { FolderList } from "./home/FolderList";
+import { StoragePanel } from "./StoragePanel";
+import { SecondBrainPanel } from "./SecondBrainPanel";
+import { addDraft, removeDraft, type FolderRow } from "./home/folders";
 
 const empty: Snapshot = {
   agents: agents as Agent[],
@@ -29,10 +52,28 @@ const empty: Snapshot = {
 };
 const displayError = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
-const runtimeLabels: Record<string, string> = {
-  codex: "CODEX",
-  claude: "CLAUDE CODE",
-  antigravity: "ANTIGRAVITY",
+
+function focusPage(page: DesktopPage) {
+  window.scrollTo({ top: 0, behavior: "instant" });
+  const id =
+    page === "home" || page === "chat" || page === "monitor"
+      ? page
+      : `page-${page}`;
+  document.getElementById(id)?.focus({ preventScroll: true });
+}
+const agentColors: Record<string, string> = {
+  astra: "#4169E1",
+  forge: "#E98B3A",
+  mira: "#A597E8",
+  vector: "#36B7B0",
+  scout: "#879B4A",
+};
+/** สถานะ → ความสว่างของจุดแสงประจำ agent บนพื้นหลัง */
+const glowLevel: Record<string, number> = {
+  working: 0.56,
+  waiting: 0.4,
+  error: 0.32,
+  offline: 0.05,
 };
 
 export function App() {
@@ -43,13 +84,66 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [checking, setChecking] = useState(false);
   const [modal, setModal] = useState<"project" | "run" | Agent | null>(null);
+  const [drafts, setDrafts] = useState<FolderRow[]>([]);
+  const [draftPrimary, setDraftPrimary] = useState(0);
   const [theme, setTheme] = useState(
     () => localStorage.getItem("crewnest-theme") || "dark",
   );
   const [selectedRun, setSelectedRun] = useState("");
+  const [world, setWorld] = useState<WorldId>(readWorld);
+  function chooseWorld(next: WorldId) {
+    setWorld(next);
+    saveWorld(next);
+    setNotice("เปลี่ยนธีมโลกแล้ว เห็นผลที่หน้า Home");
+  }
+  const [monitorTab, setMonitorTab] = useState<ReviewTab>("changes");
+  const [queueFilter, setQueueFilter] = useState("");
+  const native = desktopAvailable();
+  const [page, setPage] = useState(() => readPage(location, native));
   const [events, setEvents] = useState<ExecutionEvent[]>([]);
   const eventCursor = useRef(0);
-  const native = desktopAvailable();
+  const pageFocus = useRef(0);
+
+  const showPage = useCallback((next: DesktopPage) => {
+    setPage(next);
+    cancelAnimationFrame(pageFocus.current);
+    pageFocus.current = requestAnimationFrame(() => focusPage(next));
+  }, []);
+
+  function openPage(next: DesktopPage, event?: MouseEvent<HTMLAnchorElement>) {
+    if (event) {
+      if (
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      )
+        return;
+      event.preventDefault();
+    }
+    if (next !== readPage(location, native)) {
+      history.pushState(null, "", pageHref(next));
+    }
+    showPage(next);
+  }
+
+  function openExecution(id: string) {
+    setSelectedRun(id);
+    setMonitorTab("logs");
+    openPage("monitor");
+  }
+
+  useEffect(() => {
+    const syncPage = () => showPage(readPage(location, native));
+    window.addEventListener("popstate", syncPage);
+    window.addEventListener("hashchange", syncPage);
+    return () => {
+      window.removeEventListener("popstate", syncPage);
+      window.removeEventListener("hashchange", syncPage);
+      cancelAnimationFrame(pageFocus.current);
+    };
+  }, [native, showPage]);
   const refresh = useCallback(async () => {
     if (desktopAvailable()) setData(await bridge.snapshot());
   }, []);
@@ -83,7 +177,7 @@ export function App() {
     eventCursor.current = 0;
     setEvents([]);
     async function poll() {
-      if (!selectedRun || !desktopAvailable()) return;
+      if (page !== "monitor" || !selectedRun || !desktopAvailable()) return;
       try {
         const next = await bridge.events(selectedRun, eventCursor.current);
         if (active && next.length) {
@@ -100,7 +194,7 @@ export function App() {
       active = false;
       clearTimeout(timer);
     };
-  }, [selectedRun]);
+  }, [page, selectedRun]);
   async function checkRuntimes() {
     setChecking(true);
     setError("");
@@ -111,6 +205,29 @@ export function App() {
       setError(displayError(cause));
     } finally {
       setChecking(false);
+    }
+  }
+  function openProjectModal() {
+    setError("");
+    setDrafts([]);
+    setDraftPrimary(0);
+    setModal("project");
+  }
+  async function addDraftFolder() {
+    setError("");
+    try {
+      const path = await bridge.pickFolder();
+      if (!path) return;
+      const inspected = await bridge.inspectFolder(path, null);
+      const next = addDraft(drafts, {
+        ...inspected,
+        exists: true,
+        isPrimary: false,
+      });
+      if ("error" in next) setError(next.error);
+      else setDrafts(next.drafts);
+    } catch (cause) {
+      setError(displayError(cause));
     }
   }
   async function createProject(event: FormEvent<HTMLFormElement>) {
@@ -126,18 +243,22 @@ export function App() {
       );
       return;
     }
+    if (!drafts.length) {
+      setError("เพิ่ม source folder อย่างน้อย 1 รายการ");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
-      const result = await bridge.createProject(
+      await bridge.createProject(
         input.data.name,
         input.data.goal,
+        drafts.map((draft) => draft.path),
+        draftPrimary,
       );
-      if (result) {
-        await refresh();
-        setModal(null);
-        setNotice("สร้างโปรเจกต์และอนุมัติ directory แล้ว");
-      }
+      await refresh();
+      setModal(null);
+      setNotice("สร้างโปรเจกต์และอนุมัติ source folders แล้ว");
     } catch (cause) {
       setError(displayError(cause));
     } finally {
@@ -162,17 +283,12 @@ export function App() {
     setError("");
     try {
       const run = await bridge.start(result.data);
-      setSelectedRun(run.id);
       await refresh();
       setModal(null);
       setNotice(
         `เริ่ม ${run.adapter === "mock" ? "MOCK · ไม่มี AI model" : (runtimeLabels[run.adapter] ?? run.adapter)} แล้ว`,
       );
-      requestAnimationFrame(() => {
-        const monitor = document.getElementById("monitor");
-        monitor?.scrollIntoView({ behavior: "instant", block: "start" });
-        monitor?.focus({ preventScroll: true });
-      });
+      openExecution(run.id);
     } catch (cause) {
       setError(displayError(cause));
     } finally {
@@ -193,386 +309,418 @@ export function App() {
             title:
               data.agents.find((agent) => agent.id === run.agentId)?.name ||
               run.agentId,
-            subtitle: `${run.adapter === "mock" ? "MOCK · " : ""}${run.status}`,
+            subtitle: `${run.adapter === "mock" ? "MOCK · " : ""}${statusLabels[run.status] ?? run.status}`,
             detail: new Date(run.createdAt).toLocaleTimeString("th-TH", {
               hour: "2-digit",
               minute: "2-digit",
             }),
             color:
-              data.agents.find((agent) => agent.id === run.agentId)
-                ?.characterKey === "forge"
-                ? "#E98B3A"
-                : "#4169E1",
+              agentColors[
+                data.agents.find((agent) => agent.id === run.agentId)
+                  ?.characterKey ?? "astra"
+              ] ?? agentColors.astra,
           })),
       })),
     [data.executions, data.agents],
   );
   const running = data.executions.filter((run) => run.status === "running");
-  const run = data.executions.find((item) => item.id === selectedRun);
+  const failed = data.executions.filter((run) => run.status === "failed");
+  const approvals = (data.tasks ?? []).filter(
+    (task) => task.gate && ["ready", "needs_review"].includes(task.status),
+  ).length;
+  // หน้า Review เปิดมาแล้วเลือก execution ล่าสุดให้เลย แทนหน้าว่าง
+  const latestRun = data.executions[0]?.id ?? "";
+  useEffect(() => {
+    if (page === "monitor" && !selectedRun && latestRun)
+      setSelectedRun(latestRun);
+  }, [page, selectedRun, latestRun]);
+  const crew = useMemo(() => sceneAgents(data), [data]);
+  // ท้องฟ้าของทีม: จุดแสงของ agent สว่างขึ้นตามสถานะจริงจาก Core
+  useEffect(() => {
+    const root = document.documentElement.style;
+    for (const agent of crew)
+      root.setProperty(
+        `--glow-${agent.characterKey}`,
+        String(glowLevel[agent.status] ?? "var(--glow-floor)"),
+      );
+  }, [crew]);
+  const pulse: [string, number, string, string][] = [
+    [
+      "กำลังรัน",
+      running.length,
+      running.length ? "run" : "idle",
+      "execution ในเครื่องตอนนี้",
+    ],
+    [
+      "รออนุมัติ",
+      approvals,
+      approvals ? "wait" : "idle",
+      "ขั้นที่ต้องให้คุณตัดสิน",
+    ],
+    [
+      "ล้มเหลว",
+      failed.length,
+      failed.length ? "bad" : "idle",
+      "จาก 100 execution ล่าสุด",
+    ],
+    ["โปรเจกต์", data.projects.length, "idle", "workspace ที่อนุญาตแล้ว"],
+  ];
+  // งานที่หยุดรอคน: gate ที่พร้อมให้อนุมัติ หรือผลที่รอตรวจ
+  const waitingOnYou = (data.tasks ?? []).filter(
+    (task) =>
+      task.status === "needs_review" || (task.gate && task.status === "ready"),
+  );
   return (
     <div className="app-shell">
-      <aside className="sidebar">
-        <a className="brand" href="#dashboard">
-          <span className="brand-mark" aria-hidden="true">
-            C
-          </span>
-          <span>
-            CrewNest<small>AI AGENT COMMAND CENTER</small>
-          </span>
-        </a>
-        <div className="nav-label">WORKSPACE</div>
-        <nav aria-label="เมนูหลัก">
-          <a href="#dashboard">
-            Overview <span>01</span>
-          </a>
-          <a href="#agents">
-            CrewBots <span>05</span>
-          </a>
-          <a href="#projects">
-            Projects <span>{data.projects.length}</span>
-          </a>
-          <a href="#monitor">
-            Executions <span>{data.executions.length}</span>
-          </a>
-          <a href="#runtimes">Runtime health</a>
-        </nav>
-        <div className="local-note">
-          <span className="status-dot" /> Local-first
-          <small>
-            Remote control: {data.remoteStatus}
-            <br />
-            Phase 3 · secure remote control
-          </small>
-        </div>
-      </aside>
-      <main id="dashboard">
-        <header className="topbar">
-          <div>
-            <span className="eyebrow">PERSONAL AI WORKSPACE</span>
-            <p>
-              <span className="status-dot" />
-              {native
-                ? "Desktop Core connected"
-                : "Browser preview · Desktop required"}
-            </p>
-          </div>
-          <div className="actions">
-            <button
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              aria-label="สลับ light/dark theme"
+      <AppRail
+        page={page}
+        native={native}
+        theme={theme}
+        badges={{
+          tasks: { count: approvals, label: "รออนุมัติ" },
+          monitor: { count: running.length, label: "กำลังรัน" },
+        }}
+        onOpenPage={openPage}
+        onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
+      />
+      <div className="app-main">
+        {page === "home" || page === "chat" ? (
+          <HomePage
+            chatOnly={page === "chat"}
+            data={data}
+            native={native}
+            theme={theme}
+            world={world}
+            onOpenPage={openPage}
+            onAddProject={openProjectModal}
+            onRefresh={refresh}
+          />
+        ) : (
+          <div className="console">
+            <main
+              className="bento"
+              id={page === "monitor" ? "monitor" : `page-${page}`}
+              tabIndex={-1}
             >
-              {theme === "dark" ? "Light" : "Dark"} theme
-            </button>
-            <span className="version">v0.1.0 / LOCAL</span>
-          </div>
-        </header>
-        {!native && (
-          <div className="banner">
-            นี่คือ frontend preview ไม่มี local execution
-            หรือข้อมูลจำลองว่าเป็นผลจริง เปิดแอปด้วย <code>pnpm desktop</code>
-          </div>
-        )}
-        <div className="page-heading">
-          <div>
-            <p className="eyebrow">COMMAND CENTER</p>
-            <h1>ทีมพร้อมรับภารกิจของคุณ</h1>
-            <p className="muted">
-              จัดการโปรเจกต์ ตรวจ runtime และติดตามทุก execution ในเครื่อง
-            </p>
-          </div>
-          <button
-            className="primary"
-            disabled={!native}
-            onClick={() => {
-              setError("");
-              setModal("run");
-            }}
-          >
-            ＋ New execution
-          </button>
-        </div>
-        {error && !modal && (
-          <div role="alert" className="error">
-            {error}
-            <button aria-label="ปิดข้อผิดพลาด" onClick={() => setError("")}>
-              ×
-            </button>
-          </div>
-        )}
-        <p role="status" className="notice">
-          {notice}
-        </p>
-        <section className="metrics" aria-label="สถานะสรุป">
-          {[
-            ["Projects", data.projects.length],
-            ["CrewBots", data.agents.length],
-            ["Running", running.length],
-            [
-              "Failed",
-              data.executions.filter((run) => run.status === "failed").length,
-            ],
-          ].map(([label, value]) => (
-            <div className="metric" key={label}>
-              <span>{label}</span>
-              <strong>{value}</strong>
-              <small>
-                {label === "CrewBots"
-                  ? "Configurable agent records"
-                  : "Local persistent state"}
-              </small>
-            </div>
-          ))}
-        </section>
-        <section id="agents">
-          <div className="section-heading">
-            <div>
-              <h2>Your CrewBots</h2>
-              <p className="muted">ห้าบทบาท หนึ่งเป้าหมายร่วมกัน</p>
-            </div>
-            <span className="tag">HUMAN APPROVAL REQUIRED</span>
-          </div>
-          <div className="agent-grid">
-            {data.agents.map((agent) => (
-              <article
-                className="agent-card"
-                key={agent.id}
-                style={
-                  {
-                    "--agent-color": (
-                      {
-                        astra: "#4169E1",
-                        forge: "#E98B3A",
-                        mira: "#A597E8",
-                        vector: "#36B7B0",
-                        scout: "#879B4A",
-                      } as Record<string, string>
-                    )[agent.characterKey],
-                  } as React.CSSProperties
-                }
-              >
-                <div className="agent-card-top">
-                  <span className="agent-number">{agent.id.toUpperCase()}</span>
-                  <span className="state">
-                    <span className="status-dot" />
-                    {agent.status}
+              <header className="page-head span-12">
+                <h1>
+                  {page === "overview"
+                    ? "Console"
+                    : consolePages.find(({ id }) => id === page)?.label}
+                </h1>
+                <div className="page-actions">
+                  <span className="chip" data-tone={native ? "ok" : "wait"}>
+                    <span className="dot" />
+                    {native
+                      ? "Desktop Core connected"
+                      : "Browser preview · Desktop required"}
                   </span>
+                  <button
+                    className="primary"
+                    disabled={!native}
+                    onClick={() => {
+                      setError("");
+                      setModal("run");
+                    }}
+                  >
+                    <span className="plus" aria-hidden="true">
+                      ＋
+                    </span>
+                    New execution
+                  </button>
                 </div>
-                <div className="avatar-stage">
-                  <img
-                    src={`/crewbots/${agent.characterKey}/${agent.status === "working" ? "working" : "idle"}.svg`}
-                    width="180"
-                    height="210"
-                    alt=""
-                  />
-                </div>
-                <h3>{agent.name}</h3>
-                <p className="role">{agent.role}</p>
-                <p className="provider">
-                  {
-                    {
-                      codex: "OpenAI Codex",
-                      claude: "Claude Code",
-                      antigravity: "Antigravity",
-                      mock: "Mock Adapter",
-                    }[agent.runtimeAdapter]
-                  }
+              </header>
+              {!native && (
+                <p className="preview-note span-12">
+                  Frontend preview: ไม่มี local execution
+                  และไม่แสดงข้อมูลจำลองเป็นผลจริง เปิดแอปด้วย{" "}
+                  <code>pnpm desktop</code>
                 </p>
-                <button
-                  onClick={() => {
+              )}
+              {error && !modal && (
+                <div role="alert" className="error span-12">
+                  {error}
+                  <button
+                    aria-label="ปิดข้อผิดพลาด"
+                    onClick={() => setError("")}
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+              <p role="status" className="notice span-12">
+                {notice}
+              </p>
+
+              {page === "overview" && (
+                <section className="pulse span-12" aria-label="สถานะสรุป">
+                  <div className="pulse-head">
+                    <h2>Pulse</h2>
+                    <span
+                      className="chip"
+                      data-tone={(data.schedulerPaused ?? true) ? "wait" : "ok"}
+                    >
+                      {(data.schedulerPaused ?? true)
+                        ? "Scheduling paused"
+                        : "Scheduling active"}
+                    </span>
+                  </div>
+                  <dl className="pulse-grid">
+                    {pulse.map(([label, value, tone, caption]) => (
+                      <div key={label} data-tone={tone}>
+                        <dt>{label}</dt>
+                        <dd>{value}</dd>
+                        <dd className="pulse-caption">{caption}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </section>
+              )}
+
+              {page === "agents" && (
+                <JobDesks
+                  data={data}
+                  states={crew}
+                  onDetails={(agent) => {
                     setError("");
                     setModal(agent);
                   }}
-                >
-                  รายละเอียด <span aria-hidden="true">↗</span>
-                </button>
-              </article>
-            ))}
-          </div>
-        </section>
-        <div className="workspace-grid">
-          <div>
-            <section className="panel" id="projects">
-              <div className="section-heading">
-                <div>
-                  <h2>Projects</h2>
-                  <p className="muted">Approved local workspaces</p>
-                </div>
-                <button
-                  disabled={!native}
-                  onClick={() => {
-                    setError("");
-                    setModal("project");
-                  }}
-                >
-                  ＋ Add project
-                </button>
-              </div>
-              {data.projects.length ? (
-                <div className="project-list">
-                  {data.projects.map((project) => (
-                    <article key={project.id}>
-                      <div>
-                        <h3>{project.name}</h3>
-                        <p>{project.goal || "ยังไม่ได้กำหนด objective"}</p>
-                        <code>{project.path}</code>
-                      </div>
-                      <span className="tag">
-                        {project.isGit ? "GIT REPOSITORY" : "LOCAL DIRECTORY"}
-                      </span>
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <div className="empty">
-                  <img
-                    src="/crewbots/astra/portrait.svg"
-                    alt=""
-                    width="80"
-                    height="74"
+                />
+              )}
+
+              {page === "tasks" && (
+                <div className="span-12 queue-slot">
+                  <QueueBoard
+                    data={data}
+                    filter={queueFilter}
+                    onFilterChange={setQueueFilter}
+                    onRefresh={refresh}
+                    onExecution={openExecution}
                   />
-                  <h3>เริ่มจากโปรเจกต์แรก</h3>
-                  <p>
-                    เลือก directory ผ่าน native dialog เพื่ออนุมัติ workspace
-                  </p>
                 </div>
               )}
-            </section>
-            <section className="panel" id="runtimes">
-              <div className="section-heading">
-                <div>
-                  <h2>Runtime health</h2>
-                  <p className="muted">
-                    ตรวจ installation และ authentication โดยไม่อ่าน credentials
-                  </p>
-                </div>
-                <button
-                  disabled={!native || checking}
-                  onClick={() => void checkRuntimes()}
-                >
-                  {checking ? "กำลังตรวจ…" : "Check runtimes"}
-                </button>
-              </div>
-              {!diagnostics.length && (
-                <p className="muted">ยังไม่ได้ตรวจ CLI ใน session นี้</p>
-              )}
-              {diagnostics.map((item) => (
-                <article className="runtime-row" key={item.adapter}>
-                  <div>
-                    <h3>
-                      {item.adapter.toUpperCase()}{" "}
-                      <span className="tag">
-                        {item.installed ? "INSTALLED" : "MISSING"}
-                      </span>
-                    </h3>
-                    <p>
-                      {item.version || "Version unavailable"} · Auth:{" "}
-                      {item.authentication}
-                    </p>
-                    <small>{item.message}</small>
-                    {item.executable && <code>{item.executable}</code>}
+
+              {page === "overview" && (
+                <aside className="tile activity span-8">
+                  <div className="tile-head">
+                    <div>
+                      <h2>Activity</h2>
+                      <p>100 runs ล่าสุดในเครื่อง</p>
+                    </div>
                   </div>
-                  <span className="state">
-                    {item.supported ? "SUPPORTED" : "UNAVAILABLE"}
-                  </span>
-                </article>
-              ))}
-            </section>
-          </div>
-          <aside className="panel activity">
-            <div className="section-heading">
-              <div>
-                <h2>Execution activity</h2>
-                <p className="muted">Recent 100 runs · local history</p>
-              </div>
-            </div>
-            <ActivityTabs groups={groups} />
-            <div className="boundary-note">
-              <h3>คุณเป็นผู้อนุมัติ</h3>
-              <p>
-                ใช้ read-only / staged writing ไม่มี push, deploy หรือ remote
-                terminal
-              </p>
-            </div>
-          </aside>
-        </div>
-        {native && <RemotePanel projects={data.projects} />}
-        <QueueBoard
-          data={data}
-          onRefresh={refresh}
-          onExecution={setSelectedRun}
-        />
-        <section className="panel" id="monitor" tabIndex={-1}>
-          <div className="section-heading">
-            <div>
-              <h2>Execution monitor</h2>
-              <p className="muted">
-                Actual persisted events · sensitive patterns redacted
-              </p>
-            </div>
-            {run?.status === "running" && (
-              <button
-                className="danger"
-                onClick={() => {
-                  void bridge
-                    .cancel(run.id)
-                    .then(() => setNotice("ส่ง cancellation request แล้ว"))
-                    .catch((cause) => setError(displayError(cause)));
-                }}
-              >
-                Cancel execution
-              </button>
-            )}
-          </div>
-          <label>
-            Execution
-            <select
-              value={selectedRun}
-              onChange={(event) => setSelectedRun(event.target.value)}
-            >
-              <option value="">เลือก execution เพื่อดู logs</option>
-              {data.executions.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.adapter === "mock" ? "[MOCK] " : ""}
-                  {item.agentId} · {item.status} · {item.id.slice(0, 8)}
-                </option>
-              ))}
-            </select>
-          </label>
-          {run && (
-            <p className="run-meta">
-              {run.adapter === "mock"
-                ? "MOCK — no AI model"
-                : (runtimeLabels[run.adapter] ?? run.adapter)}{" "}
-              · {run.status} · PID {run.pid ?? "—"}
-              {run.error && <span className="error-text"> · {run.error}</span>}
-            </p>
-          )}
-          <div
-            className="log-view"
-            role="region"
-            aria-label="Execution logs"
-            tabIndex={0}
-          >
-            {events.length ? (
-              events.map((item) => (
-                <div className="log-line" key={item.id}>
-                  <span>
-                    {new Date(item.createdAt).toLocaleTimeString("th-TH")}
-                  </span>
-                  <b>{item.kind}</b>
-                  <pre>{item.text}</pre>
+                  <ActivityTabs groups={groups} />
+                </aside>
+              )}
+
+              {page === "overview" && (
+                <section
+                  className="tile waiting span-4"
+                  aria-label="งานที่รอคุณ"
+                >
+                  <div className="tile-head">
+                    <div>
+                      <h2>รอคุณตัดสิน</h2>
+                      <p>{waitingOnYou.length} ขั้นที่หยุดรอคุณ</p>
+                    </div>
+                  </div>
+                  {waitingOnYou.length ? (
+                    <ul className="waiting-list">
+                      {waitingOnYou.slice(0, 6).map((task) => (
+                        <li key={task.id}>
+                          <a
+                            href={pageHref("tasks")}
+                            onClick={(event) => openPage("tasks", event)}
+                          >
+                            <img
+                              className="agent-avatar"
+                              data-agent={task.agentId}
+                              src={`/crewbots/${task.agentId}/portrait.svg`}
+                              alt=""
+                              width="32"
+                              height="32"
+                            />
+                            <span>
+                              <b>
+                                {task.step === "task"
+                                  ? task.title
+                                  : (stepLabels[task.step] ?? task.title)}
+                              </b>
+                              <small>
+                                {agentName(data.agents, task.agentId)} ·{" "}
+                                {data.projects.find(
+                                  (item) => item.id === task.projectId,
+                                )?.name ?? "—"}
+                              </small>
+                            </span>
+                            <span className="chip" data-tone="wait">
+                              {statusLabels[task.status] ?? task.status}
+                            </span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="hint">ไม่มีงานรอคุณ ทีมเดินงานต่อได้เอง</p>
+                  )}
+                </section>
+              )}
+
+              {page === "projects" && (
+                <>
+                  <section className="tile span-12">
+                    <div className="tile-head">
+                      <div>
+                        <h2>Projects</h2>
+                        <p>{data.projects.length} workspaces ที่อนุมัติแล้ว</p>
+                      </div>
+                      <button disabled={!native} onClick={openProjectModal}>
+                        <span className="plus" aria-hidden="true">
+                          ＋
+                        </span>
+                        Add project
+                      </button>
+                    </div>
+                    {data.projects.length ? (
+                      <ul className="project-grid">
+                        {data.projects.map((project) => {
+                          const projectTasks = (data.tasks ?? []).filter(
+                            (task) => task.projectId === project.id,
+                          );
+                          const progress = progressOf(projectTasks);
+                          const flows = (data.workflows ?? []).filter(
+                            (flow) => flow.projectId === project.id,
+                          ).length;
+                          const runs = data.executions.filter(
+                            (item) => item.projectId === project.id,
+                          ).length;
+                          return (
+                            <li key={project.id} className="project-card">
+                              <div className="project-card-head">
+                                <h3>{project.name}</h3>
+                                <span className="chip">
+                                  {project.isGit ? "Git" : "Folder"}
+                                </span>
+                                {(project.folders?.length ?? 1) > 1 && (
+                                  <span className="chip">
+                                    {project.folders?.length} folders
+                                  </span>
+                                )}
+                              </div>
+                              <p className="project-goal">
+                                {project.goal || "ยังไม่ได้กำหนด objective"}
+                              </p>
+                              <code className="path">
+                                {displayPath(project.path)}
+                              </code>
+                              <div className="project-progress">
+                                <span className="meter" aria-hidden="true">
+                                  <span
+                                    style={{ width: `${progress.percent}%` }}
+                                  />
+                                </span>
+                                <span>
+                                  {progress.completed}/{progress.total} ขั้น ·{" "}
+                                  {progress.percent}%
+                                </span>
+                              </div>
+                              <dl className="project-stats">
+                                <div>
+                                  <dt>Workflow</dt>
+                                  <dd>{flows}</dd>
+                                </div>
+                                <div>
+                                  <dt>กำลังทำ</dt>
+                                  <dd>{progress.running}</dd>
+                                </div>
+                                <div>
+                                  <dt>รอคุณ</dt>
+                                  <dd>{progress.waiting}</dd>
+                                </div>
+                                <div>
+                                  <dt>Execution</dt>
+                                  <dd>{runs}</dd>
+                                </div>
+                              </dl>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : (
+                      <div className="empty">
+                        <img
+                          src="/crewbots/astra/portrait.svg"
+                          alt=""
+                          width="56"
+                          height="52"
+                        />
+                        <div>
+                          <h3>เริ่มจากโปรเจกต์แรก</h3>
+                          <p className="hint">
+                            เลือก directory ผ่าน native dialog เพื่ออนุมัติ
+                            workspace
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </section>
+                  <ProjectsOverview
+                    data={data}
+                    diagnostics={diagnostics}
+                    native={native}
+                  />
+                </>
+              )}
+
+              {page === "themes" && (
+                <Themes
+                  data={data}
+                  states={crew}
+                  theme={theme === "light" ? "light" : "dark"}
+                  world={world}
+                  onSelect={chooseWorld}
+                />
+              )}
+
+              {page === "storage" && <StoragePanel native={native} />}
+              {page === "brain" && <SecondBrainPanel native={native} />}
+              {page === "runtimes" && (
+                <Connectors
+                  data={data}
+                  diagnostics={diagnostics}
+                  checking={checking}
+                  native={native}
+                  onCheck={() => void checkRuntimes()}
+                />
+              )}
+
+              {native && page === "remote" && (
+                <div className="span-12 remote-slot">
+                  <RemotePanel projects={data.projects} />
                 </div>
-              ))
-            ) : (
-              <p className="muted">ยังไม่มี events สำหรับ execution ที่เลือก</p>
-            )}
+              )}
+
+              {page === "monitor" && (
+                <ReviewPage
+                  data={data}
+                  selectedRun={selectedRun}
+                  onSelectRun={setSelectedRun}
+                  events={events}
+                  tab={monitorTab}
+                  onTab={setMonitorTab}
+                  onCancel={(id) => {
+                    void bridge
+                      .cancel(id)
+                      .then(() => setNotice("ส่ง cancellation request แล้ว"))
+                      .catch((cause) => setError(displayError(cause)));
+                  }}
+                  onRefresh={refresh}
+                  onOpenQueue={() => openPage("tasks")}
+                />
+              )}
+            </main>
           </div>
-        </section>
-        <footer>
-          CREWNEST · LOCAL-FIRST AI OPERATIONS{" "}
-          <span>{data.dataPath || "No Desktop database connected"}</span>
-        </footer>
-      </main>
+        )}
+      </div>
       {modal && (
         <Modal
           title={
@@ -616,10 +764,28 @@ export function App() {
                   disabled={busy}
                 />
               </label>
-              <p className="muted">
-                ขั้นต่อไปเปิด native picker การเลือก directory เป็นการอนุมัติ
-                workspace นี้
-              </p>
+              <fieldset className="folder-field">
+                <legend>Source folders</legend>
+                <FolderList
+                  rows={drafts.map((draft, index) => ({
+                    ...draft,
+                    isPrimary: index === draftPrimary,
+                  }))}
+                  busy={busy}
+                  onAdd={() => void addDraftFolder()}
+                  onRemove={(index) => {
+                    const next = removeDraft(drafts, index, draftPrimary);
+                    setDrafts(next.drafts);
+                    setDraftPrimary(next.primary);
+                  }}
+                  onMakePrimary={setDraftPrimary}
+                />
+                <p className="hint">
+                  เลือก folder ผ่าน native picker เป็นการอนุมัติ workspace;
+                  primary คือที่ agent ทำงาน folder
+                  อื่นเป็นบริบทแบบอ่านอย่างเดียว (1 folder ต่อ 1 git repo)
+                </p>
+              </fieldset>
               <div className="modal-actions">
                 <button
                   type="button"
@@ -628,8 +794,8 @@ export function App() {
                 >
                   ยกเลิก
                 </button>
-                <button className="primary" disabled={busy}>
-                  {busy ? "รอเลือก directory…" : "เลือก directory และสร้าง"}
+                <button className="primary" disabled={busy || !drafts.length}>
+                  {busy ? "กำลังสร้าง…" : "สร้างโปรเจกต์"}
                 </button>
               </div>
             </form>
@@ -723,12 +889,11 @@ export function App() {
                 />
                 ฉันอนุมัติ prompt นี้ใน workspace ที่เลือกแบบ read-only
               </label>
-              <p className="muted">
-                Mock ใช้เวลาประมาณ 15 วินาทีเพื่อให้ตรวจ logs และ cancellation
-                ได้ Runtime ต้องตรง agent: Codex สำหรับ ASTRA/VECTOR/SCOUT,
-                Claude สำหรับ FORGE, Antigravity สำหรับ MIRA หลังตรวจ
-                diagnostics จะมี native confirmation ก่อนเริ่ม ไม่รองรับ writing
-                หรือ high-risk actions
+              <p className="hint">
+                Runtime ต้องตรง agent: Codex สำหรับ ASTRA/VECTOR/SCOUT, Claude
+                สำหรับ FORGE, Antigravity สำหรับ MIRA · Mock ใช้ราว 15 วินาที ·
+                มี native confirmation ก่อนเริ่ม ไม่รองรับ writing หรือ
+                high-risk actions
               </p>
               <div className="modal-actions">
                 <button
@@ -769,10 +934,6 @@ export function App() {
                   <dt>Capabilities</dt>
                   <dd>{modal.capabilities.join(", ")}</dd>
                 </dl>
-                <p className="muted">
-                  Role records เก็บใน SQLite · Configuration editing อยู่ Phase
-                  2
-                </p>
               </div>
             </div>
           )}

@@ -1,0 +1,290 @@
+/* หน้า Job desks: แถบลำดับการส่งต่องาน + การ์ดโต๊ะงาน */
+.job-desks {
+  display: grid;
+  gap: 32px;
+  min-width: 0;
+}
+.desk-section {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.desk-section > h2 {
+  font-size: var(--t-lg);
+}
+
+/* ---- ภาพเส้น isometric ---- */
+.iso-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-height: 150px;
+  --iso-line: rgb(255 255 255 / 0.32);
+  --iso-top: #1a1815;
+  --iso-side: #121110;
+  --iso-accent: #ebae42;
+}
+[data-theme="light"] .iso-art {
+  --iso-line: rgb(28 25 23 / 0.38);
+  --iso-top: #ffffff;
+  --iso-side: #f0eeec;
+  --iso-accent: #b45309;
+}
+.iso-box polygon {
+  stroke: var(--iso-line);
+  stroke-width: 0.9;
+  stroke-linejoin: round;
+}
+.iso-top {
+  fill: var(--iso-top);
+}
+.iso-left,
+.iso-right {
+  fill: var(--iso-side);
+}
+.iso-box.accent .iso-top {
+  stroke: var(--iso-accent);
+}
+.iso-pin,
+.iso-dot {
+  fill: var(--iso-line);
+}
+.iso-ring {
+  fill: none;
+  stroke: var(--iso-accent);
+  stroke-width: 0.8;
+  stroke-dasharray: 2 2;
+}
+.iso-core {
+  fill: var(--iso-accent);
+}
+.iso-line {
+  stroke: var(--iso-line);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+.iso-line.accent {
+  stroke: var(--iso-accent);
+}
+
+/* ---- แถบลำดับงาน ---- */
+.flow-strip {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border-radius: var(--r-tile);
+  background: var(--well);
+  box-shadow: inset 0 0 0 1px var(--hair);
+  list-style: none;
+}
+.flow-step {
+  display: grid;
+  grid-template-rows: 168px auto;
+  min-width: 0;
+}
+.flow-step + .flow-step {
+  box-shadow: inset 1px 0 0 var(--hair);
+}
+.flow-art {
+  display: grid;
+  place-items: center;
+  padding: 16px 24px;
+  background-color: var(--canvas, var(--well));
+  background-image: radial-gradient(var(--dot-grid, var(--hair-2)) 1px, transparent 1.2px);
+  background-size: 16px 16px;
+  box-shadow: inset 0 -1px 0 var(--hair);
+}
+.flow-text {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 16px 20px 20px;
+}
+.flow-index {
+  color: var(--ink-2);
+  font-size: var(--t-sm);
+}
+.flow-who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.flow-who b {
+  font-weight: 500;
+}
+.avatar-stack {
+  display: inline-flex;
+}
+.avatar-stack > * + * {
+  margin-inline-start: -8px;
+}
+.avatar-stack .agent-avatar,
+.you-avatar {
+  width: 32px;
+  height: 32px;
+  padding: 4px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--well);
+}
+.you-avatar {
+  display: inline-grid;
+  place-items: center;
+  background: var(--selected, var(--tile));
+  color: var(--ink);
+}
+.flow-desc {
+  color: var(--ink-2);
+  font-size: var(--t-sm);
+}
+
+/* ---- การ์ดโต๊ะงาน ---- */
+.desk-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: 16px;
+}
+.desk-card {
+  display: grid;
+  grid-template-rows: 160px 1fr;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: var(--r-tile);
+  background: var(--well);
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+.desk-scene {
+  position: relative;
+  display: grid;
+  place-items: center;
+  background-color: color-mix(in srgb, var(--agent, var(--c-astra)) 14%, var(--canvas, var(--well)));
+  background-image: radial-gradient(rgb(255 255 255 / 0.08) 1px, transparent 1.2px);
+  background-size: 12px 12px;
+  box-shadow: inset 0 -1px 0 var(--hair);
+}
+.desk-scene[data-agent="astra"] {
+  --agent: var(--c-astra);
+}
+.desk-scene[data-agent="forge"] {
+  --agent: var(--c-forge);
+}
+.desk-scene[data-agent="mira"] {
+  --agent: var(--c-mira);
+}
+.desk-scene[data-agent="vector"] {
+  --agent: var(--c-vector);
+}
+.desk-scene[data-agent="scout"] {
+  --agent: var(--c-scout);
+}
+.desk-scene img {
+  height: 124px;
+  width: auto;
+}
+.desk-caption {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgb(20 18 15 / 0.85);
+  color: #f5f5f4;
+  font-size: var(--t-xs);
+}
+.desk-body {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  padding: 20px;
+}
+.desk-role {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 12px;
+}
+.role-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-inner);
+  background: var(--raised, var(--tile));
+  box-shadow: inset 0 0 0 1px var(--hair);
+  color: var(--ink-2);
+}
+.desk-role h3 {
+  font-size: var(--t-md);
+  font-weight: 500;
+}
+.desk-role p {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--ink-2);
+  font-size: var(--t-sm);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.agent-chip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  justify-self: start;
+  padding: 4px 12px 4px 4px;
+  border-radius: 999px;
+  background: var(--raised, var(--tile));
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+.agent-chip .agent-avatar {
+  width: 28px;
+  height: 28px;
+  padding: 2px;
+}
+.agent-chip b {
+  font-weight: 500;
+}
+.agent-chip .runtime-badge {
+  width: 22px;
+  height: 22px;
+  font-size: 8px;
+}
+.desk-flow {
+  display: grid;
+  gap: 8px;
+}
+.desk-flow div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--t-sm);
+}
+.desk-flow dt {
+  color: var(--ink-2);
+}
+.desk-flow dd {
+  text-align: right;
+}
+.desk-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 16px;
+  box-shadow: inset 0 1px 0 var(--hair);
+  color: var(--ink-2);
+  font-size: var(--t-sm);
+}
+
+@media (max-width: 1200px) {
+  .flow-strip {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+  .flow-step + .flow-step {
+    box-shadow:
+      inset 1px 0 0 var(--hair),
+      inset 0 1px 0 var(--hair);
+  }
+}

@@ -1,0 +1,701 @@
+/* Astra · liquid glass foundation
+   กฎ: กระจก (.glass) ใช้กับชั้นควบคุมที่ลอยอยู่ (dock, toolbar, ปุ่ม, sheet)
+   เนื้อหาใช้ material ทึบกว่า (.tile) เพื่อให้อ่านง่าย พื้นหลังคือ "ท้องฟ้า" สีของทีม
+   ที่สว่างขึ้นตรงตำแหน่งของ agent ที่กำลังทำงาน (--glow-* ตั้งจาก JS) */
+
+@font-face {
+  font-family: "LINE Seed Sans TH";
+  src: url("/fonts/LINESeedSansTH_W_Rg.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "LINE Seed Sans TH";
+  src: url("/fonts/LINESeedSansTH_W_Bd.woff2") format("woff2");
+  font-weight: 600 900;
+  font-display: swap;
+}
+
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  /* field = ท้องฟ้ากลางคืน, ink = ตัวอักษร */
+  --field: #100e24;
+  --field-2: #1c173a;
+  --ink: #f8f6ff;
+  --ink-2: #d5cde8;
+  --ink-3: #b6adc9;
+  --accent: #bbc1ff;
+  --accent-ink: #fff;
+  --accent-fill: #4e4bc0;
+  /* material ของเนื้อหา */
+  --tile: rgb(30 24 54 / 0.9);
+  --tile-solid: #201a37;
+  --well: rgb(10 8 27 / 0.42);
+  --hair: rgb(251 242 255 / 0.13);
+  --hair-2: rgb(251 242 255 / 0.22);
+  /* กระจก */
+  --glass: rgb(187 168 246 / 0.12);
+  --glass-hi: rgb(239 222 255 / 0.16);
+  --glass-rim: rgb(251 240 255 / 0.57);
+  --glass-rim-2: rgb(172 190 255 / 0.25);
+  --glass-surface: rgb(31 24 54 / 0.83);
+  --glass-caustic: rgb(195 166 255 / 0.16);
+  --glass-refract: rgb(113 164 255 / 0.21);
+  --ambient-warm: #ae4c91;
+  --ambient-cool: #5d54c7;
+  --glass-shadow: 0 18px 40px -18px rgb(0 0 0 / 0.65);
+  --tile-shadow: 0 24px 48px -32px rgb(0 0 0 / 0.8);
+  /* สถานะ */
+  --ok: #3fd6a4;
+  --run: #6f9bff;
+  --wait: #f5b84a;
+  --bad: #ff7684;
+  --idle: #8b97ad;
+  --bad-ink: #ffb3bc;
+  --glow-floor: 0.16;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --field: #e8e7fa;
+  --field-2: #f8f1fb;
+  --ink: #211936;
+  --ink-2: #493e60;
+  --ink-3: #594e70;
+  --accent: #4636a1;
+  --accent-ink: #fff;
+  --accent-fill: #4c39ac;
+  --tile: rgb(253 251 255 / 0.89);
+  --tile-solid: #fcfaff;
+  --well: rgb(225 218 244 / 0.53);
+  --hair: rgb(17 27 48 / 0.08);
+  --hair-2: rgb(17 27 48 / 0.15);
+  --glass: rgb(255 255 255 / 0.55);
+  --glass-hi: rgb(255 255 255 / 0.79);
+  --glass-rim: rgb(255 255 255 / 0.98);
+  --glass-rim-2: rgb(104 77 153 / 0.29);
+  --glass-surface: rgb(251 247 255 / 0.83);
+  --glass-caustic: rgb(255 240 252 / 0.8);
+  --glass-refract: rgb(170 191 247 / 0.3);
+  --ambient-warm: #e29bce;
+  --ambient-cool: #a19be9;
+  --glass-shadow: 0 16px 36px -20px rgb(30 50 90 / 0.45);
+  --tile-shadow: 0 24px 48px -36px rgb(30 50 90 / 0.5);
+  --ok: #10956a;
+  --run: #2b57cf;
+  --wait: #8b5300;
+  --bad: #c9354b;
+  --idle: #6b7890;
+  --bad-ink: #a2223a;
+  --glow-floor: 0.22;
+}
+
+:root {
+  /* สีประจำ agent: แหล่งสีของท้องฟ้า */
+  --c-astra: #4169e1;
+  --c-forge: #e98b3a;
+  --c-mira: #a597e8;
+  --c-vector: #36b7b0;
+  --c-scout: #879b4a;
+  --glow-astra: var(--glow-floor);
+  --glow-forge: var(--glow-floor);
+  --glow-mira: var(--glow-floor);
+  --glow-vector: var(--glow-floor);
+  --glow-scout: var(--glow-floor);
+  /* รัศมีแบบซ้อนกัน (concentric): tile 26 → แถวภายใน 14 → chip เต็มวง */
+  --r-tile: 26px;
+  --r-inner: 14px;
+  --r-control: 12px;
+  --r-pill: 999px;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --font: "LINE Seed Sans TH", "Segoe UI", system-ui, sans-serif;
+  --mono: "Cascadia Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  /* ระดับตัวอักษร */
+  --t-xs: 11.5px;
+  --t-sm: 13px;
+  --t-md: 14px;
+  --t-lg: 17px;
+  --t-xl: clamp(24px, 2.3vw, 34px);
+  /* Lucian tabs อ่านค่าจากชุดนี้ */
+  --ux-page: var(--field);
+  --ux-surface: var(--well);
+  --ux-surface-2: var(--tile);
+  --ux-surface-3: var(--hair-2);
+  --ux-ink: var(--ink);
+  --ux-ink-2: var(--ink-2);
+  --ux-ink-3: var(--ink-3);
+  --ux-line: var(--hair);
+  --ux-accent: var(--accent);
+  --ux-accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
+  --ux-shadow-strong: rgb(0 0 0 / 0.4);
+  --ux-ease: var(--ease);
+  --ux-spring: var(--spring);
+}
+
+* {
+  box-sizing: border-box;
+}
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: var(--scroll-inset, 92px);
+}
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--field);
+  isolation: isolate;
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: var(--t-md);
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ท้องฟ้าของทีม: แต่ละจุดแสงคือหนึ่ง agent ความเข้มตามสถานะ */
+body::before {
+  content: "";
+  position: fixed;
+  inset: -10vmax;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      38vmax 30vmax at 12% 8%,
+      color-mix(in srgb, var(--c-astra) calc(var(--glow-astra) * 100%), transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      30vmax 26vmax at 88% 14%,
+      color-mix(in srgb, var(--c-forge) calc(var(--glow-forge) * 100%), transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      34vmax 28vmax at 72% 82%,
+      color-mix(in srgb, var(--c-mira) calc(var(--glow-mira) * 100%), transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      30vmax 26vmax at 22% 78%,
+      color-mix(in srgb, var(--c-vector) calc(var(--glow-vector) * 100%), transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      26vmax 22vmax at 50% 46%,
+      color-mix(in srgb, var(--c-scout) calc(var(--glow-scout) * 100%), transparent),
+      transparent 70%
+    ),
+    radial-gradient(ellipse at 78% 6%, var(--ambient-warm), transparent 43%),
+    radial-gradient(ellipse at 28% 55%, var(--ambient-cool), transparent 58%),
+    linear-gradient(148deg, var(--field-2), var(--field) 68%);
+  transition: background 1.2s var(--ease);
+}
+
+h1,
+h2,
+h3,
+p,
+dl,
+dd {
+  margin: 0;
+}
+h1 {
+  font-size: var(--t-xl);
+  line-height: 1.25;
+}
+h2 {
+  font-size: var(--t-lg);
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+h3 {
+  font-size: var(--t-md);
+  line-height: 1.35;
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+code,
+pre {
+  font-family: var(--mono);
+}
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.muted {
+  color: var(--ink-2);
+}
+.workspace-heading {
+  display: grid;
+  gap: 4px;
+  padding: 10px 4px 3px;
+}
+.workspace-heading p {
+  max-width: 60ch;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ---------- กระจก: ชั้นควบคุม ---------- */
+.glass {
+  position: relative;
+  isolation: isolate;
+  background: var(--tile-solid);
+  box-shadow:
+    inset 0 1px 0 var(--glass-rim),
+    inset 0 -1px 0 var(--glass-rim-2),
+    var(--glass-shadow);
+}
+/* ขอบกระจกและแสงสะท้อนอิง Liquid Glass Studio โดยใช้ชั้น CSS */
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass {
+    background:
+      radial-gradient(ellipse at 5% 0%, var(--glass-caustic), transparent 50%),
+      radial-gradient(ellipse at 100% 100%, var(--glass-refract), transparent 54%),
+      linear-gradient(172deg, var(--glass-hi), transparent 48%),
+      var(--glass-surface);
+    -webkit-backdrop-filter: blur(20px) saturate(155%);
+    backdrop-filter: blur(20px) saturate(155%);
+  }
+}
+.glass::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border: 1px solid transparent;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    var(--glass-rim),
+    var(--glass-rim-2) 23%,
+    transparent 45%,
+    var(--glass-rim-2) 72%,
+    var(--glass-rim)
+  ) border-box;
+  mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* แถบทางลัดและเมนูย่อย */
+.glass-nav {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+.glass-nav a,
+.glass-nav button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 5px 13px;
+  border-radius: var(--r-pill);
+  background: transparent;
+  box-shadow: none;
+  color: var(--ink-2);
+  font-size: var(--t-sm);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.glass-nav a:hover,
+.glass-nav button:hover:not(:disabled) {
+  color: var(--ink);
+  background:
+    linear-gradient(180deg, var(--glass-hi), transparent),
+    var(--glass);
+  box-shadow: inset 0 0 0 1px var(--hair-2);
+}
+
+/* ---------- material ของเนื้อหา ---------- */
+.tile {
+  position: relative;
+  min-width: 0;
+  padding: 18px;
+  border-radius: var(--r-tile);
+  background: var(--tile);
+  box-shadow:
+    inset 0 1px 0 var(--hair-2),
+    inset 0 0 0 1px var(--hair),
+    var(--tile-shadow);
+}
+.tile-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+  min-height: 34px;
+}
+.tile-head > div {
+  min-width: 0;
+}
+.tile-head p {
+  color: var(--ink-3);
+  font-size: var(--t-sm);
+}
+.tile-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.well {
+  border-radius: var(--r-inner);
+  background: var(--well);
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+
+/* ---------- ปุ่ม ---------- */
+button {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--glass);
+  color: var(--ink);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow:
+    inset 0 1px 0 var(--glass-hi),
+    inset 0 0 0 1px var(--hair-2);
+  transition:
+    background 0.18s var(--ease),
+    box-shadow 0.18s var(--ease),
+    transform 0.18s var(--spring);
+}
+button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--glass) 60%, var(--glass-hi));
+}
+button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+button.primary {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.10), transparent 55%),
+    var(--accent-fill);
+  color: var(--accent-ink);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.45),
+    inset 0 0 0 1px rgb(255 255 255 / 0.12),
+    0 8px 20px -10px var(--accent-fill);
+}
+button.primary:hover:not(:disabled) {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.16), transparent 55%),
+    var(--accent-fill);
+}
+button.danger {
+  color: var(--bad-ink);
+}
+button.quiet {
+  background: transparent;
+  box-shadow: none;
+  color: var(--ink-2);
+}
+button.quiet:hover:not(:disabled) {
+  background: var(--glass);
+  color: var(--ink);
+}
+button.icon {
+  width: 40px;
+  min-height: 40px;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+}
+button.link {
+  min-height: 0;
+  padding: 2px 0;
+  border-radius: 4px;
+  background: none;
+  box-shadow: none;
+  color: var(--accent);
+  font-weight: 600;
+}
+.plus {
+  font-size: 15px;
+  line-height: 1;
+  margin-top: -1px;
+}
+
+/* ---------- ชิปสถานะ ---------- */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 9px;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  box-shadow: inset 0 0 0 1px var(--hair);
+  color: var(--ink-2);
+  font-size: var(--t-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--idle);
+}
+[data-tone="ok"] > .dot,
+.dot[data-tone="ok"] {
+  background: var(--ok);
+}
+[data-tone="run"] > .dot,
+.dot[data-tone="run"] {
+  background: var(--run);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--run) 25%, transparent);
+}
+[data-tone="wait"] > .dot,
+.dot[data-tone="wait"] {
+  background: var(--wait);
+}
+[data-tone="bad"] > .dot,
+.dot[data-tone="bad"] {
+  background: var(--bad);
+}
+
+/* ---------- ฟอร์ม ---------- */
+label {
+  display: grid;
+  gap: 6px;
+  color: var(--ink-2);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+input,
+textarea,
+select {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--r-control);
+  background: var(--well);
+  color: var(--ink);
+  font-size: var(--t-md);
+  font-weight: 400;
+  box-shadow: inset 0 0 0 1px var(--hair-2);
+  transition: box-shadow 0.18s var(--ease);
+}
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  box-shadow:
+    inset 0 0 0 1px var(--accent),
+    0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+select option {
+  background: var(--tile-solid);
+  color: var(--ink);
+}
+textarea {
+  resize: vertical;
+  line-height: 1.55;
+}
+label.checkbox,
+label.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--ink);
+  font-weight: 400;
+}
+label.checkbox input,
+label.check input {
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  margin: 2px 0 0;
+  padding: 0;
+  flex: none;
+  accent-color: var(--accent-fill);
+  box-shadow: none;
+}
+form {
+  display: grid;
+  gap: 14px;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+.hint {
+  color: var(--ink-3);
+  font-size: var(--t-sm);
+  line-height: 1.55;
+}
+
+/* ---------- แจ้งเตือน ---------- */
+.error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--r-inner);
+  background: color-mix(in srgb, var(--bad) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bad) 40%, transparent);
+  color: var(--bad-ink);
+  font-size: var(--t-sm);
+}
+.error button {
+  min-height: 26px;
+  width: 26px;
+  padding: 0;
+}
+.error-text {
+  color: var(--bad-ink);
+  font-size: var(--t-sm);
+}
+
+/* ---------- Sheet (dialog) ---------- */
+dialog {
+  width: min(600px, calc(100vw - 24px));
+  max-height: min(88vh, 900px);
+  margin: auto;
+  overflow: auto;
+  padding: 22px;
+  border: 0;
+  border-radius: 30px;
+  color: var(--ink);
+  background:
+    linear-gradient(180deg, var(--glass-hi), transparent 30%),
+    color-mix(in srgb, var(--tile-solid) 82%, transparent);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  backdrop-filter: blur(30px) saturate(180%);
+  box-shadow:
+    inset 0 1px 0 var(--glass-rim),
+    inset 0 0 0 1px var(--hair-2),
+    0 40px 80px -30px rgb(0 0 0 / 0.6);
+}
+dialog[open] {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+dialog::backdrop {
+  background: rgb(4 10 24 / 0.42);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.modal-header h2 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.modal-header button {
+  width: 40px;
+  min-height: 40px;
+  padding: 0;
+  font-size: 18px;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ---------- การเข้าถึง ---------- */
+@media (pointer: coarse) {
+  button:not(.link),
+  .glass-nav a,
+  .modal-header button {
+    min-height: 44px;
+  }
+  button.icon,
+  .modal-header button {
+    width: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .glass,
+  .tile,
+  dialog,
+  button {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .glass,
+  dialog {
+    background: var(--tile-solid);
+  }
+  .tile {
+    background: var(--tile-solid);
+  }
+  body::before {
+    opacity: 0.35;
+  }
+}
+@media (prefers-contrast: more) {
+  :root,
+  :root[data-theme] {
+    --hair: rgb(127 140 165 / 0.6);
+    --hair-2: rgb(127 140 165 / 0.85);
+  }
+  .tile,
+  .glass {
+    background: var(--tile-solid);
+  }
+}

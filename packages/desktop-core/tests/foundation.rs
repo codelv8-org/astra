@@ -38,7 +38,7 @@ fn migrations_seed_and_persistence_are_idempotent() {
         db.query_row("SELECT COUNT(*) FROM schema_migrations", [], |r| r
             .get::<_, i32>(0))
             .unwrap(),
-        4
+        7
     );
 }
 
@@ -95,7 +95,7 @@ fn newer_schema_is_not_downgraded() {
     store
         .connect()
         .unwrap()
-        .pragma_update(None, "user_version", 5)
+        .pragma_update(None, "user_version", 8)
         .unwrap();
     assert!(Store::open(&store.path).is_err());
 }
@@ -124,6 +124,54 @@ fn logs_and_stored_prompts_are_redacted() {
     assert!(!text.contains("token-content"));
     assert_eq!(redact(&input.prompt), run.prompt);
     assert_eq!(store.events(&run.id, 1).unwrap().len(), 0);
+}
+
+#[test]
+fn recorded_result_is_project_scoped_and_independent_of_recent_executions() {
+    let (_dir, store, project_id) = setup();
+    let run = store.begin_run(&request(&project_id), "mock").unwrap();
+    store.event(&run.id, "output", "log only").unwrap();
+    assert!(store
+        .execution_result(&run.id, &project_id)
+        .unwrap()
+        .event
+        .is_none());
+    store.event(&run.id, "result", "old result").unwrap();
+    let fallback = store.event(&run.id, "result", "latest result").unwrap();
+    assert_eq!(
+        store
+            .execution_result(&run.id, &project_id)
+            .unwrap()
+            .event
+            .unwrap()
+            .id,
+        fallback.id
+    );
+    store.event(&run.id, "artifact", "old artifact").unwrap();
+    let text = format!("api_key=private-value {}", "ภาษาไทย".repeat(5000));
+    let artifact = store.event(&run.id, "artifact", &text).unwrap();
+    store.event(&run.id, "result", "later result").unwrap();
+    store.finish(&run.id, "completed", None).unwrap();
+    for _ in 0..100 {
+        let newer = store.begin_run(&request(&project_id), "mock").unwrap();
+        store.finish(&newer.id, "completed", None).unwrap();
+    }
+    assert!(!store
+        .snapshot()
+        .unwrap()
+        .executions
+        .iter()
+        .any(|item| item.id == run.id));
+    assert!(store.execution_result(&run.id, "other-project").is_err());
+    assert!(store.execution_result("missing", &project_id).is_err());
+    let result = store.execution_result(&run.id, &project_id).unwrap();
+    assert_eq!(result.agent_id, "astra");
+    assert_eq!(result.adapter, "mock");
+    let saved = result.event.unwrap();
+    assert_eq!(saved.id, artifact.id);
+    assert_eq!(saved.text, artifact.text);
+    assert_eq!(saved.text.chars().count(), 32768);
+    assert!(!saved.text.contains("private-value"));
 }
 
 #[test]
@@ -251,4 +299,43 @@ async fn log_storage_failure_never_reports_success() {
         .error
         .unwrap()
         .contains("Cannot persist"));
+}
+
+#[test]
+fn antigravity_login_is_confirmed_only_by_latest_finished_run() {
+    let (_dir, store, id) = setup();
+    store
+        .connect()
+        .unwrap()
+        .execute("UPDATE agents SET record=json_set(record,'$.runtimeAdapter','antigravity') WHERE id='astra'", [])
+        .unwrap();
+    let input = RunRequest {
+        adapter: "antigravity".into(),
+        ..request(&id)
+    };
+    assert_eq!(store.runtime_confirmed_at("antigravity").unwrap(), None);
+
+    let run = store.begin_run(&input, "agy").unwrap();
+    assert_eq!(store.runtime_confirmed_at("antigravity").unwrap(), None);
+    store.finish(&run.id, "completed", None).unwrap();
+    let confirmed = store.runtime_confirmed_at("antigravity").unwrap();
+    assert!(confirmed.is_some());
+    assert_eq!(store.runtime_confirmed_at("claude").unwrap(), None);
+
+    // ยกเลิกเองไม่บอกอะไรเรื่อง login จึงไม่ลบผลยืนยันเดิม
+    let run = store.begin_run(&input, "agy").unwrap();
+    store
+        .finish(&run.id, "canceled", Some("Canceled by owner"))
+        .unwrap();
+    assert_eq!(
+        store.runtime_confirmed_at("antigravity").unwrap(),
+        confirmed
+    );
+
+    // รันล้มเหลวล่าสุดอาจเป็นเพราะหลุด login จึงกลับไปเป็นไม่ทราบ
+    let run = store.begin_run(&input, "agy").unwrap();
+    store
+        .finish(&run.id, "failed", Some("auth required"))
+        .unwrap();
+    assert_eq!(store.runtime_confirmed_at("antigravity").unwrap(), None);
 }

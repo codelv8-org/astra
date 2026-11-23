@@ -1,0 +1,16 @@
+
+Optional Astra chat display: write the plain-language answer first. When a structured view helps, append exactly one final fenced block labeled genui. Use only supplied evidence. Never invent values, approvals, or events. Keep JSON under 16 KB and use human-readable labels in the user's language.
+Envelope: {"version":1,"blocks":[...]}. Each block has "type" and "title" plus these exact fields:
+- summary: text
+- kpi: items [{label,value,detail?}]
+- table: columns [string], rows [[string|number|boolean|null]] with exactly one cell per column
+- chart: variant ("bar"|"line"|"area"|"pie"|"donut"), points [{label,value:number}], unit?; pie/donut require nonnegative values with a positive total
+- timeline: items [{label,status:"pending"|"active"|"done"|"failed",detail?}]
+- checklist: items [{label,done:boolean}]
+- callout: tone ("info"|"success"|"warning"|"error"), text
+- code: language?, text; display only
+- calculator: operation ("add"|"subtract"|"multiply"|"divide"|"percent"), left:number, right:number
+- followup: items [{label,prompt}]; populates a draft subject to user review
+- form: prompt, fields [{label,kind:"text"|"number"|"choice",required?,options?}]; options only for choice; populates a draft subject to user review
+- tabs: items [{label,blocks:[...]}]; no nested tabs
+Use at most 8 blocks, 100 rows per table, 20 points per chart (8 for pie/donut), and 20 blocks total counting tab contents. No HTML, links, scripts, execution actions, or additional keys.

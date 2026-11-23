@@ -1,4 +1,4 @@
-﻿param([ValidateSet('core-test','ipc-test','desktop-dev','desktop-build','core-smoke','real-smoke','workflow-smoke','queue-smoke','real-workflow','core-clippy','remote-host-build')][string]$Action = 'core-test',[switch]$RetryFailed,[switch]$Reverify)
+﻿param([ValidateSet('core-test','ipc-test','desktop-dev','desktop-build','desktop-installer','core-smoke','real-smoke','workflow-smoke','queue-smoke','real-workflow','core-clippy','remote-host-build')][string]$Action = 'core-test',[switch]$RetryFailed,[switch]$Reverify)
 $ErrorActionPreference = 'Stop'
 # เลือก Visual Studio ที่มี C++ workload จริง ไม่ใช้ installation ที่ขาด libraries
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
@@ -19,6 +19,7 @@ switch ($Action) {
     'core-clippy' { & cargo clippy --package crewnest-core --all-targets -- -D warnings }
     'desktop-dev' { & pnpm --filter '@crewnest/desktop' tauri dev }
     'desktop-build' { & pnpm --filter '@crewnest/desktop' tauri build --no-bundle }
+    'desktop-installer' { & pnpm --filter '@crewnest/desktop' tauri build --bundles nsis }
     'core-smoke' { & cargo run --package crewnest-core --example smoke }
     'real-smoke' { & cargo run --package crewnest-core --example smoke -- --real }
     'workflow-smoke' { & cargo run --package crewnest-core --example workflow_smoke }

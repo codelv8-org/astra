@@ -187,3 +187,111 @@ async fn immediate_remote_cancel_resolves_the_new_execution_without_scheduler_ti
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn remote_commands_are_attributed_before_effect_and_on_rejection() {
+    let (_d, core, p, c) = setup();
+    core.share_remote_project(&p, true, false).unwrap();
+    let remote_task = Uuid::new_v4().to_string();
+    let mut submit = envelope(&c, &p, &remote_task, "submit");
+    submit["payload"] =
+        json!({"agentId":"astra","adapter":"mock","title":"test","prompt":"test only"});
+    core.handle_remote(&c, serde_json::from_value(submit).unwrap())
+        .await
+        .unwrap();
+    let local = core.store.tasks().unwrap()[0].id.clone();
+    let created = core.store.task_events(&local).unwrap();
+    assert!(created.iter().any(|e| e.kind == "created"
+        && e.initiator == "remote"
+        && e.initiator_ref.as_deref() == Some(c.device_id.as_str())));
+
+    let start = envelope(&c, &p, &remote_task, "start");
+    let ack = core
+        .handle_remote(&c, serde_json::from_value(start.clone()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(ack["state"], "rejected");
+    let events = core.store.task_events(&local).unwrap();
+    let cmd = events.iter().find(|e| e.kind == "remote_command").unwrap();
+    let rej = events.iter().find(|e| e.kind == "remote_rejected").unwrap();
+    assert!(cmd.id < rej.id);
+    assert_eq!(cmd.initiator, "remote");
+    assert_eq!(rej.initiator, "remote");
+    assert!(!events.iter().any(|e| e.kind == "execution_started"));
+
+    core.handle_remote(&c, serde_json::from_value(start).unwrap())
+        .await
+        .unwrap();
+    let again = core.store.task_events(&local).unwrap();
+    assert_eq!(again.iter().filter(|e| e.kind == "remote_command").count(), 1);
+}
+
+#[tokio::test]
+async fn remote_does_not_write_events_on_unshared_tasks() {
+    let (d, core, p, c) = setup();
+    core.share_remote_project(&p, true, false).unwrap();
+    std::fs::create_dir(d.path().join("private")).unwrap();
+    let private = core
+        .store
+        .register_project("PRIVATE", "", &d.path().join("private"))
+        .unwrap();
+    let task = core
+        .store
+        .create_task(
+            crewnest_core::models::TaskInput {
+                project_id: private.id.clone(),
+                agent_id: "astra".into(),
+                adapter: "mock".into(),
+                title: "private".into(),
+                prompt: "test only".into(),
+                dependencies: vec![],
+                priority: 50,
+                timeout_seconds: 5,
+                retry_limit: 0,
+            },
+            &crewnest_core::models::Initiator::Owner,
+        )
+        .unwrap();
+    for project in [&p, &private.id] {
+        let ack = core
+            .handle_remote(
+                &c,
+                serde_json::from_value(envelope(&c, project, &task.id, "start")).unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(ack["state"], "rejected");
+    }
+    let events = core.store.task_events(&task.id).unwrap();
+    assert!(events.iter().all(|e| e.initiator == "owner"), "{events:?}");
+}
+
+#[tokio::test]
+async fn failed_attribution_write_does_not_block_remote_command() {
+    let (_d, core, p, c) = setup();
+    core.share_remote_project(&p, true, false).unwrap();
+    let remote_task = Uuid::new_v4().to_string();
+    let mut submit = envelope(&c, &p, &remote_task, "submit");
+    submit["payload"] =
+        json!({"agentId":"astra","adapter":"mock","title":"test","prompt":"test only"});
+    core.handle_remote(&c, serde_json::from_value(submit).unwrap())
+        .await
+        .unwrap();
+    core.store
+        .connect()
+        .unwrap()
+        .execute_batch(
+            "CREATE TRIGGER block_remote_events BEFORE INSERT ON task_events \
+             WHEN NEW.kind IN ('remote_command','remote_rejected') BEGIN SELECT RAISE(FAIL,'busy'); END;",
+        )
+        .unwrap();
+    let ack = core
+        .handle_remote(
+            &c,
+            serde_json::from_value(envelope(&c, &p, &remote_task, "cancel")).unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(ack["state"], "accepted");
+    assert_eq!(core.store.tasks().unwrap()[0].status, "canceled");
+}

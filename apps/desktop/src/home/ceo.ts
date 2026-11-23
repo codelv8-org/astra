@@ -1,0 +1,433 @@
+import type {
+  Agent,
+  Execution,
+  QueueTask,
+  Snapshot,
+  Workflow,
+} from "../../../../packages/shared/src";
+import type { SceneAgent, SceneStatus } from "./OfficeScene";
+import type { GenSpec } from "./genui/spec";
+import genuiPrompt from "../../../../packages/desktop-core/src/genui_prompt.txt?raw";
+
+/**
+ * ตรรกะ CEO (ASTRA) บนหน้า Home
+ * ข้อความรายงานสร้างจากสถานะที่ Core บันทึกจริงเท่านั้น ไม่สร้างผลงานหรือคำตอบ AI ขึ้นเอง
+ * ผลลัพธ์จาก runtime ดึงจาก artifact ที่ Core ใช้ส่งต่อระหว่างขั้นตอน
+ */
+
+export const stepOrder = [
+  "plan",
+  "plan_approval",
+  "architecture",
+  "design",
+  "implement",
+  "review",
+  "uat",
+  "summary",
+] as const;
+export const stepLabels: Record<string, string> = {
+  plan: "วางแผน",
+  plan_approval: "อนุมัติแผน",
+  architecture: "สถาปัตยกรรม",
+  design: "ออกแบบ UI/UX",
+  implement: "พัฒนา",
+  review: "ตรวจสอบ",
+  uat: "UAT",
+  summary: "สรุปผล",
+  task: "งานเดี่ยว",
+};
+export const statusLabels: Record<string, string> = {
+  draft: "ร่าง",
+  ready: "รออนุมัติ",
+  queued: "เข้าคิว",
+  running: "กำลังทำ",
+  blocked: "ติดขัด",
+  needs_review: "รอตรวจ",
+  completed: "เสร็จ",
+  failed: "ล้มเหลว",
+  canceled: "ยกเลิก",
+};
+const waitingStates = new Set(["draft", "ready", "blocked", "needs_review"]);
+
+export interface ChatMessage {
+  id: string;
+  from: "owner" | "ceo" | "agent";
+  agentId?: string;
+  /** ผู้รับของข้อความจากเจ้าของ (agent id) ไม่มี = ทั้งทีม */
+  to?: string;
+  text: string;
+  at: string;
+  /** core = รายงานจากสถานะ Core, model = ผลจาก runtime จริง, mock = Mock Adapter */
+  source?: "core" | "model" | "mock";
+  runtime?: string;
+  projectId?: string;
+  workflowId?: string;
+  link?: "queue";
+  genUI?: GenSpec;
+}
+
+export interface Progress {
+  total: number;
+  completed: number;
+  running: number;
+  waiting: number;
+  failed: number;
+  percent: number;
+  current: QueueTask | null;
+}
+
+export function stepIndex(task: QueueTask) {
+  const index = stepOrder.indexOf(task.step as (typeof stepOrder)[number]);
+  return index < 0 ? stepOrder.length : index;
+}
+
+export function sortTasks(tasks: QueueTask[]) {
+  return [...tasks].sort(
+    (a, b) =>
+      stepIndex(a) - stepIndex(b) || a.createdAt.localeCompare(b.createdAt),
+  );
+}
+
+export function progressOf(tasks: QueueTask[]): Progress {
+  const active = tasks.filter((task) => task.status !== "canceled");
+  const completed = active.filter((task) => task.status === "completed").length;
+  const ordered = sortTasks(active);
+  const current =
+    ordered.find((task) => task.status === "running") ??
+    ordered.find((task) => task.status !== "completed") ??
+    null;
+  return {
+    total: active.length,
+    completed,
+    running: active.filter((task) => task.status === "running").length,
+    waiting: active.filter((task) => waitingStates.has(task.status)).length,
+    failed: active.filter((task) => task.status === "failed").length,
+    percent: active.length ? Math.round((completed / active.length) * 100) : 0,
+    current,
+  };
+}
+
+export function agentName(agents: Agent[], id: string) {
+  return agents.find((agent) => agent.id === id)?.name ?? id.toUpperCase();
+}
+
+export function describeTask(task: QueueTask, agents: Agent[]) {
+  return `${stepLabels[task.step] ?? task.title} · ${agentName(agents, task.agentId)} · ${statusLabels[task.status] ?? task.status}`;
+}
+
+export function handoffStatus(task: QueueTask) {
+  if (
+    task.status === "blocked" &&
+    task.blocker === "Waiting for dependencies / human gates"
+  )
+    return "รอขั้นก่อนหน้า";
+  return statusLabels[task.status] ?? task.status;
+}
+
+export function chatApprovalLabel(
+  task: QueueTask,
+  activeWorkflows: ReadonlySet<string>,
+) {
+  if (task.workflowId && !activeWorkflows.has(task.workflowId)) return null;
+  if (task.status === "needs_review") {
+    if (task.step === "review") return "ตรวจและยืนยันผล";
+    if (task.agentId === "forge" && task.adapter === "claude")
+      return "ตรวจและยืนยัน patch";
+  }
+  if (task.status !== "ready" || task.approved) return null;
+  if (task.step === "plan_approval" && task.gate) return "ยืนยันแผน";
+  if (task.step === "uat" && task.gate) return "ยืนยัน UAT";
+  if (task.gate) return "ยืนยันขั้นตอน";
+  if (
+    task.step === "implement" &&
+    task.agentId === "forge" &&
+    task.adapter === "claude"
+  ) {
+    return "ตรวจขอบเขตและอนุมัติ";
+  }
+  return "ตรวจและอนุมัติ";
+}
+
+export function pendingChatApprovals(
+  tasks: QueueTask[],
+  projectId: string,
+  activeWorkflows: ReadonlySet<string>,
+) {
+  return sortTasks(
+    tasks.filter((task) => task.projectId === projectId),
+  ).flatMap((task) => {
+    const label = chatApprovalLabel(task, activeWorkflows);
+    return label ? [{ task, label }] : [];
+  });
+}
+
+export function handoffRoute(
+  task: QueueTask,
+  tasksById: ReadonlyMap<string, QueueTask>,
+  agents: Agent[],
+) {
+  const assignee = (item: QueueTask) =>
+    item.gate ? "ผู้อนุมัติ" : agentName(agents, item.agentId);
+  const senders = new Set(
+    task.dependencies.flatMap((id) => {
+      const parent = tasksById.get(id);
+      if (!parent) return [];
+      const beforeGate = parent.gate
+        ? parent.dependencies.flatMap((dependency) => {
+            const item = tasksById.get(dependency);
+            return item ? [assignee(item)] : [];
+          })
+        : [];
+      return [...beforeGate, assignee(parent)];
+    }),
+  );
+  return [...senders, assignee(task)].join(" → ");
+}
+
+/** สถานะหุ่นในฉาก 3D คำนวณจาก task/execution จริง */
+export function sceneAgents(data: Snapshot): SceneAgent[] {
+  const tasks = data.tasks ?? [];
+  return data.agents.map((agent) => {
+    const mine = tasks.filter((task) => task.agentId === agent.id);
+    const runningTask = mine.find((task) => task.status === "running");
+    const runningExec = data.executions.find(
+      (run) => run.agentId === agent.id && run.status === "running",
+    );
+    const waiting = sortTasks(mine).find((task) =>
+      // blocked = รอ dependency ไม่ใช่งานที่หุ่นถืออยู่ จึงแสดงเฉพาะขั้นที่รอคน
+      ["ready", "needs_review"].includes(task.status),
+    );
+    const failed = mine.find((task) => task.status === "failed");
+    let status: SceneStatus = "idle";
+    let activity = agent.role;
+    if (runningTask || runningExec) {
+      status = "working";
+      activity = runningTask
+        ? `กำลังทำ · ${stepLabels[runningTask.step] ?? runningTask.title}`
+        : "กำลังทำ execution";
+    } else if (waiting) {
+      status = "waiting";
+      activity = `${statusLabels[waiting.status]} · ${stepLabels[waiting.step] ?? waiting.title}`;
+    } else if (failed) {
+      status = "error";
+      activity = `ล้มเหลว · ${stepLabels[failed.step] ?? failed.title}`;
+    } else if (agent.status === "offline") status = "offline";
+    return {
+      id: agent.id,
+      name: agent.name,
+      characterKey: agent.characterKey,
+      status,
+      activity,
+      runtime: agent.runtimeAdapter,
+    };
+  });
+}
+
+export type StatusMap = Record<string, string>;
+export function statusMap(tasks: QueueTask[]): StatusMap {
+  return Object.fromEntries(tasks.map((task) => [task.id, task.status]));
+}
+
+export interface Change {
+  task: QueueTask;
+  from: string | null;
+  to: string;
+}
+export function diffTasks(previous: StatusMap, tasks: QueueTask[]): Change[] {
+  return tasks
+    .filter((task) => previous[task.id] !== task.status)
+    .map((task) => ({
+      task,
+      from: previous[task.id] ?? null,
+      to: task.status,
+    }));
+}
+
+/** รวมการเปลี่ยนสถานะใน workflow เดียวกันเป็นรายงานหนึ่งข้อความ */
+export function changeReports(
+  changes: Change[],
+  data: Snapshot,
+): Omit<ChatMessage, "id" | "at">[] {
+  const groups = new Map<string, Change[]>();
+  for (const change of changes) {
+    if (!change.from) continue; // task ใหม่ถูกรายงานตอนรับงานแล้ว
+    // ร่าง → ติดขัด คือ Core จัดคิวรอ dependency ตอนสร้าง workflow ไม่ใช่ความคืบหน้า
+    if (change.from === "draft" && change.to === "blocked") continue;
+    const { task } = change;
+    const speaker = task.gate ? "astra" : task.agentId;
+    const key = `${task.workflowId ?? task.id}:${speaker}`;
+    groups.set(key, [...(groups.get(key) ?? []), change]);
+  }
+  const tasks = data.tasks ?? [];
+  return [...groups.values()].map((list) => {
+    const first = list[0].task;
+    const speaker = first.gate ? "astra" : first.agentId;
+    const workflow = data.workflows?.find(
+      (item) => item.id === first.workflowId,
+    );
+    const project = data.projects.find(
+      (item) => item.id === list[0].task.projectId,
+    );
+    const progress = progressOf(
+      workflow
+        ? tasks.filter((task) => task.workflowId === workflow.id)
+        : [list[0].task],
+    );
+    const lines = sortTasks(list.map((change) => change.task)).map((task) => {
+      const change = list.find((item) => item.task.id === task.id)!;
+      return `• ${stepLabels[task.step] ?? task.title} (${agentName(data.agents, task.agentId)}): ${statusLabels[change.from!] ?? change.from} → ${handoffStatus(task)}${task.blocker && ["blocked", "failed", "ready"].includes(task.status) ? ` — ${task.blocker}` : ""}`;
+    });
+    const gate = list.some((change) =>
+      ["ready", "needs_review"].includes(change.task.status),
+    );
+    return {
+      from: speaker === "astra" ? ("ceo" as const) : ("agent" as const),
+      agentId: speaker,
+      source: "core" as const,
+      projectId: list[0].task.projectId,
+      workflowId: workflow?.id,
+      link: gate ? ("queue" as const) : undefined,
+      text: [
+        `อัปเดต ${project?.name ?? "โปรเจกต์"}${workflow ? ` — “${clip(workflow.objective, 60)}”` : ""}`,
+        ...lines,
+        `ความคืบหน้า ${progress.completed}/${progress.total} ขั้น (${progress.percent}%)`,
+        gate ? "ตรวจรายการ “รอการยืนยัน” ในแชทเพื่ออนุมัติขั้นตอนนี้" : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    };
+  });
+}
+
+export function progressReport(
+  data: Snapshot,
+  projectId: string | null,
+): string {
+  const tasks = data.tasks ?? [];
+  const workflows = (data.workflows ?? [])
+    .filter((item) => !projectId || item.projectId === projectId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const project = data.projects.find((item) => item.id === projectId);
+  if (!workflows.length)
+    return `${project ? `โปรเจกต์ ${project.name} ` : ""}ยังไม่มีงานที่สั่งผ่าน workflow พิมพ์เป้าหมายงานแล้วกดส่ง ผมจะสร้างแผนให้คุณอนุมัติก่อนเริ่ม`;
+  const lines = workflows.slice(0, 5).map((workflow) => {
+    const progress = progressOf(
+      tasks.filter((task) => task.workflowId === workflow.id),
+    );
+    const name =
+      data.projects.find((item) => item.id === workflow.projectId)?.name ?? "";
+    const now = progress.current
+      ? describeTask(progress.current, data.agents)
+      : "ครบทุกขั้น";
+    return `• ${projectId ? "" : `[${name}] `}“${clip(workflow.objective, 56)}” — ${progress.completed}/${progress.total} (${progress.percent}%) · ตอนนี้: ${now}${progress.failed ? ` · ล้มเหลว ${progress.failed}` : ""}`;
+  });
+  const waiting = tasks.filter(
+    (task) =>
+      (!projectId || task.projectId === projectId) &&
+      task.gate &&
+      ["ready", "needs_review"].includes(task.status),
+  ).length;
+  return [
+    `สรุปสถานะ${project ? ` ${project.name}` : "ทุกโปรเจกต์"} (${workflows.length} งาน)`,
+    ...lines,
+    workflows.length > 5 ? `…และอีก ${workflows.length - 5} งาน` : "",
+    waiting ? `รอคุณอนุมัติ ${waiting} ขั้นตอน` : "ไม่มีขั้นตอนที่รอคุณอนุมัติ",
+    (data.schedulerPaused ?? true)
+      ? "หมายเหตุ: Scheduling ถูก pause อยู่ งานที่อนุมัติแล้วจะยังไม่เริ่มจนกว่าจะ Resume"
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+export function acceptedReport(
+  workflow: Workflow,
+  data: Snapshot,
+  mock: boolean,
+): string {
+  const tasks = sortTasks(
+    (data.tasks ?? []).filter((task) => task.workflowId === workflow.id),
+  );
+  const project = data.projects.find((item) => item.id === workflow.projectId);
+  const steps = tasks.length
+    ? tasks
+        .map(
+          (task) =>
+            `${stepLabels[task.step] ?? task.title} (${agentName(data.agents, task.agentId)})`,
+        )
+        .join(" → ")
+    : "Core กำลังสร้างขั้นตอน";
+  return [
+    `รับงานแล้วครับ — ${project?.name ?? "โปรเจกต์"}`,
+    `สร้าง workflow ${workflow.id.slice(0, 8)}${mock ? " แบบ MOCK (ไม่มี AI model)" : ""}`,
+    `ลำดับงาน: ${steps}`,
+    "ขั้นที่พร้อมจะขึ้นใน “รอการยืนยัน” ในแชท ผมจะรายงานที่นี่เมื่อสถานะเปลี่ยน",
+  ].join("\n");
+}
+
+const progressPattern =
+  /^(ขอ)?(สถานะ|ความคืบหน้า|รายงาน|อัปเดต|อัพเดท|progress|status|report|update)/i;
+export function isProgressQuery(text: string) {
+  const value = text.trim();
+  return value.length <= 60 && progressPattern.test(value);
+}
+
+/** ดึงผลจาก execution ที่สำเร็จ รวมถึงขั้นที่มีผลแล้วและกำลังรอตรวจ */
+export function agentResultCandidates(
+  data: Snapshot,
+  seen: Set<string>,
+): { task: QueueTask; execution: Execution }[] {
+  const tasks = new Map((data.tasks ?? []).map((task) => [task.id, task]));
+  return data.executions.flatMap((execution) => {
+    if (execution.status !== "completed" || seen.has(execution.id)) return [];
+    const task = tasks.get(execution.taskId);
+    return task &&
+      !task.gate &&
+      task.agentId === execution.agentId
+      ? [{ task, execution }]
+      : [];
+  });
+}
+
+/** "@ชื่อ ข้อความ" ส่งตรงถึง agent คนนั้น ถ้าไม่มี mention ใช้ผู้รับที่เลือกไว้ ("" = ทั้งทีม) */
+export function chatTarget(text: string, agents: Agent[], selected: string) {
+  const match = /^@(\S+)\s+([\s\S]+)$/.exec(text.trim());
+  const name = match?.[1].toLowerCase();
+  const agent = agents.find(
+    (item) => item.id.toLowerCase() === name || item.name.toLowerCase() === name,
+  );
+  return match && agent
+    ? { agentId: agent.id, text: match[2].trim() }
+    : { agentId: selected, text: text.trim() };
+}
+
+/** งานเดี่ยวจากห้องแชทรวม: ยังต้องให้ผู้ใช้อนุมัติก่อนรันเหมือนงานในคิว */
+export function directTaskInput(
+  agent: Agent,
+  projectId: string,
+  text: string,
+  mock: boolean,
+) {
+  return {
+    projectId,
+    agentId: agent.id,
+    adapter: mock ? ("mock" as const) : agent.runtimeAdapter,
+    title: `${agent.name} — แชท`,
+    prompt: `Message from the owner in the team chat room (reply to the owner directly, in their language):
+${text}${mock ? "" : genuiPrompt}`,
+    dependencies: [],
+    priority: 50,
+    timeoutSeconds: agent.executionSettings.timeoutSeconds || 300,
+    retryLimit: 2,
+  };
+}
+
+export function clip(text: string, length: number) {
+  const value = text.replace(/\s+/g, " ").trim();
+  return value.length > length ? `${value.slice(0, length - 1)}…` : value;
+}
+
+/** ตัด Windows verbatim prefix ออกเพื่อแสดงผล */
+export function displayPath(path: string) {
+  return path.startsWith("\\\\?\\") ? path.slice(4) : path;
+}
