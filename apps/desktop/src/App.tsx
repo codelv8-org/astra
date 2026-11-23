@@ -35,6 +35,7 @@ import { runtimeLabels } from "./ExecutionResultView";
 import { ReviewPage, type ReviewTab } from "./ReviewPage";
 import { JobDesks } from "./JobDesks";
 import { Connectors } from "./Connectors";
+import { ProjectsOverview } from "./ProjectsOverview";
 import { Themes } from "./Themes";
 import { readWorld, saveWorld, type WorldId } from "./home/worlds";
 import { FolderList } from "./home/FolderList";
@@ -330,7 +331,8 @@ export function App() {
   // หน้า Review เปิดมาแล้วเลือก execution ล่าสุดให้เลย แทนหน้าว่าง
   const latestRun = data.executions[0]?.id ?? "";
   useEffect(() => {
-    if (page === "monitor" && !selectedRun && latestRun) setSelectedRun(latestRun);
+    if (page === "monitor" && !selectedRun && latestRun)
+      setSelectedRun(latestRun);
   }, [page, selectedRun, latestRun]);
   const crew = useMemo(() => sceneAgents(data), [data]);
   // ท้องฟ้าของทีม: จุดแสงของ agent สว่างขึ้นตามสถานะจริงจาก Core
@@ -343,9 +345,24 @@ export function App() {
       );
   }, [crew]);
   const pulse: [string, number, string, string][] = [
-    ["กำลังรัน", running.length, running.length ? "run" : "idle", "execution ในเครื่องตอนนี้"],
-    ["รออนุมัติ", approvals, approvals ? "wait" : "idle", "ขั้นที่ต้องให้คุณตัดสิน"],
-    ["ล้มเหลว", failed.length, failed.length ? "bad" : "idle", "จาก 100 execution ล่าสุด"],
+    [
+      "กำลังรัน",
+      running.length,
+      running.length ? "run" : "idle",
+      "execution ในเครื่องตอนนี้",
+    ],
+    [
+      "รออนุมัติ",
+      approvals,
+      approvals ? "wait" : "idle",
+      "ขั้นที่ต้องให้คุณตัดสิน",
+    ],
+    [
+      "ล้มเหลว",
+      failed.length,
+      failed.length ? "bad" : "idle",
+      "จาก 100 execution ล่าสุด",
+    ],
     ["โปรเจกต์", data.projects.length, "idle", "workspace ที่อนุญาตแล้ว"],
   ];
   // งานที่หยุดรอคน: gate ที่พร้อมให้อนุมัติ หรือผลที่รอตรวจ
@@ -367,324 +384,342 @@ export function App() {
         onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
       />
       <div className="app-main">
-      {page === "home" || page === "chat" ? (
-        <HomePage
-          chatOnly={page === "chat"}
-          data={data}
-          native={native}
-          theme={theme}
-          world={world}
-          onOpenPage={openPage}
-          onAddProject={openProjectModal}
-          onRefresh={refresh}
-        />
-      ) : (
-        <div className="console">
-          <main
-            className="bento"
-            id={page === "monitor" ? "monitor" : `page-${page}`}
-            tabIndex={-1}
-          >
-            <header className="page-head span-12">
-              <h1>
-                {page === "overview"
-                  ? "Console"
-                  : consolePages.find(({ id }) => id === page)?.label}
-              </h1>
-              <div className="page-actions">
-                <span className="chip" data-tone={native ? "ok" : "wait"}>
-                  <span className="dot" />
-                  {native
-                    ? "Desktop Core connected"
-                    : "Browser preview · Desktop required"}
-                </span>
-                <button
-                  className="primary"
-                  disabled={!native}
-                  onClick={() => {
-                    setError("");
-                    setModal("run");
-                  }}
-                >
-                  <span className="plus" aria-hidden="true">
-                    ＋
+        {page === "home" || page === "chat" ? (
+          <HomePage
+            chatOnly={page === "chat"}
+            data={data}
+            native={native}
+            theme={theme}
+            world={world}
+            onOpenPage={openPage}
+            onAddProject={openProjectModal}
+            onRefresh={refresh}
+          />
+        ) : (
+          <div className="console">
+            <main
+              className="bento"
+              id={page === "monitor" ? "monitor" : `page-${page}`}
+              tabIndex={-1}
+            >
+              <header className="page-head span-12">
+                <h1>
+                  {page === "overview"
+                    ? "Console"
+                    : consolePages.find(({ id }) => id === page)?.label}
+                </h1>
+                <div className="page-actions">
+                  <span className="chip" data-tone={native ? "ok" : "wait"}>
+                    <span className="dot" />
+                    {native
+                      ? "Desktop Core connected"
+                      : "Browser preview · Desktop required"}
                   </span>
-                  New execution
-                </button>
-              </div>
-            </header>
-            {!native && (
-              <p className="preview-note span-12">
-                Frontend preview: ไม่มี local execution
-                และไม่แสดงข้อมูลจำลองเป็นผลจริง เปิดแอปด้วย{" "}
-                <code>pnpm desktop</code>
-              </p>
-            )}
-            {error && !modal && (
-              <div role="alert" className="error span-12">
-                {error}
-                <button aria-label="ปิดข้อผิดพลาด" onClick={() => setError("")}>
-                  ×
-                </button>
-              </div>
-            )}
-            <p role="status" className="notice span-12">
-              {notice}
-            </p>
-
-            {page === "overview" && (
-              <section className="pulse span-12" aria-label="สถานะสรุป">
-                <div className="pulse-head">
-                  <h2>Pulse</h2>
-                  <span className="chip" data-tone={(data.schedulerPaused ?? true) ? "wait" : "ok"}>
-                    {(data.schedulerPaused ?? true)
-                      ? "Scheduling paused"
-                      : "Scheduling active"}
-                  </span>
-                </div>
-                <dl className="pulse-grid">
-                  {pulse.map(([label, value, tone, caption]) => (
-                    <div key={label} data-tone={tone}>
-                      <dt>{label}</dt>
-                      <dd>{value}</dd>
-                      <dd className="pulse-caption">{caption}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </section>
-            )}
-
-            {page === "agents" && (
-              <JobDesks
-                data={data}
-                states={crew}
-                onDetails={(agent) => {
-                  setError("");
-                  setModal(agent);
-                }}
-              />
-            )}
-
-            {page === "tasks" && (
-              <div className="span-12 queue-slot">
-                <QueueBoard
-                  data={data}
-                  filter={queueFilter}
-                  onFilterChange={setQueueFilter}
-                  onRefresh={refresh}
-                  onExecution={openExecution}
-                />
-              </div>
-            )}
-
-            {page === "overview" && (
-              <aside className="tile activity span-8">
-                <div className="tile-head">
-                  <div>
-                    <h2>Activity</h2>
-                    <p>100 runs ล่าสุดในเครื่อง</p>
-                  </div>
-                </div>
-                <ActivityTabs groups={groups} />
-              </aside>
-            )}
-
-            {page === "overview" && (
-              <section className="tile waiting span-4" aria-label="งานที่รอคุณ">
-                <div className="tile-head">
-                  <div>
-                    <h2>รอคุณตัดสิน</h2>
-                    <p>{waitingOnYou.length} ขั้นที่หยุดรอคุณ</p>
-                  </div>
-                </div>
-                {waitingOnYou.length ? (
-                  <ul className="waiting-list">
-                    {waitingOnYou.slice(0, 6).map((task) => (
-                      <li key={task.id}>
-                        <a
-                          href={pageHref("tasks")}
-                          onClick={(event) => openPage("tasks", event)}
-                        >
-                          <img
-                            className="agent-avatar"
-                            data-agent={task.agentId}
-                            src={`/crewbots/${task.agentId}/portrait.svg`}
-                            alt=""
-                            width="32"
-                            height="32"
-                          />
-                          <span>
-                            <b>
-                              {task.step === "task"
-                                ? task.title
-                                : (stepLabels[task.step] ?? task.title)}
-                            </b>
-                            <small>
-                              {agentName(data.agents, task.agentId)} ·{" "}
-                              {data.projects.find((item) => item.id === task.projectId)
-                                ?.name ?? "—"}
-                            </small>
-                          </span>
-                          <span className="chip" data-tone="wait">
-                            {statusLabels[task.status] ?? task.status}
-                          </span>
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="hint">ไม่มีงานรอคุณ ทีมเดินงานต่อได้เอง</p>
-                )}
-              </section>
-            )}
-
-            {page === "projects" && (
-              <section className="tile span-12">
-                <div className="tile-head">
-                  <div>
-                    <h2>Projects</h2>
-                    <p>{data.projects.length} workspaces ที่อนุมัติแล้ว</p>
-                  </div>
                   <button
+                    className="primary"
                     disabled={!native}
-                    onClick={openProjectModal}
+                    onClick={() => {
+                      setError("");
+                      setModal("run");
+                    }}
                   >
                     <span className="plus" aria-hidden="true">
                       ＋
                     </span>
-                    Add project
+                    New execution
                   </button>
                 </div>
-                {data.projects.length ? (
-                  <ul className="project-grid">
-                    {data.projects.map((project) => {
-                      const projectTasks = (data.tasks ?? []).filter(
-                        (task) => task.projectId === project.id,
-                      );
-                      const progress = progressOf(projectTasks);
-                      const flows = (data.workflows ?? []).filter(
-                        (flow) => flow.projectId === project.id,
-                      ).length;
-                      const runs = data.executions.filter(
-                        (item) => item.projectId === project.id,
-                      ).length;
-                      return (
-                        <li key={project.id} className="project-card">
-                          <div className="project-card-head">
-                            <h3>{project.name}</h3>
-                            <span className="chip">
-                              {project.isGit ? "Git" : "Folder"}
-                            </span>
-                            {(project.folders?.length ?? 1) > 1 && (
-                              <span className="chip">
-                                {project.folders?.length} folders
-                              </span>
-                            )}
-                          </div>
-                          <p className="project-goal">
-                            {project.goal || "ยังไม่ได้กำหนด objective"}
-                          </p>
-                          <code className="path">{displayPath(project.path)}</code>
-                          <div className="project-progress">
-                            <span className="meter" aria-hidden="true">
-                              <span style={{ width: `${progress.percent}%` }} />
-                            </span>
-                            <span>
-                              {progress.completed}/{progress.total} ขั้น ·{" "}
-                              {progress.percent}%
-                            </span>
-                          </div>
-                          <dl className="project-stats">
-                            <div>
-                              <dt>Workflow</dt>
-                              <dd>{flows}</dd>
-                            </div>
-                            <div>
-                              <dt>กำลังทำ</dt>
-                              <dd>{progress.running}</dd>
-                            </div>
-                            <div>
-                              <dt>รอคุณ</dt>
-                              <dd>{progress.waiting}</dd>
-                            </div>
-                            <div>
-                              <dt>Execution</dt>
-                              <dd>{runs}</dd>
-                            </div>
-                          </dl>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : (
-                  <div className="empty">
-                    <img
-                      src="/crewbots/astra/portrait.svg"
-                      alt=""
-                      width="56"
-                      height="52"
-                    />
+              </header>
+              {!native && (
+                <p className="preview-note span-12">
+                  Frontend preview: ไม่มี local execution
+                  และไม่แสดงข้อมูลจำลองเป็นผลจริง เปิดแอปด้วย{" "}
+                  <code>pnpm desktop</code>
+                </p>
+              )}
+              {error && !modal && (
+                <div role="alert" className="error span-12">
+                  {error}
+                  <button
+                    aria-label="ปิดข้อผิดพลาด"
+                    onClick={() => setError("")}
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+              <p role="status" className="notice span-12">
+                {notice}
+              </p>
+
+              {page === "overview" && (
+                <section className="pulse span-12" aria-label="สถานะสรุป">
+                  <div className="pulse-head">
+                    <h2>Pulse</h2>
+                    <span
+                      className="chip"
+                      data-tone={(data.schedulerPaused ?? true) ? "wait" : "ok"}
+                    >
+                      {(data.schedulerPaused ?? true)
+                        ? "Scheduling paused"
+                        : "Scheduling active"}
+                    </span>
+                  </div>
+                  <dl className="pulse-grid">
+                    {pulse.map(([label, value, tone, caption]) => (
+                      <div key={label} data-tone={tone}>
+                        <dt>{label}</dt>
+                        <dd>{value}</dd>
+                        <dd className="pulse-caption">{caption}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </section>
+              )}
+
+              {page === "agents" && (
+                <JobDesks
+                  data={data}
+                  states={crew}
+                  onDetails={(agent) => {
+                    setError("");
+                    setModal(agent);
+                  }}
+                />
+              )}
+
+              {page === "tasks" && (
+                <div className="span-12 queue-slot">
+                  <QueueBoard
+                    data={data}
+                    filter={queueFilter}
+                    onFilterChange={setQueueFilter}
+                    onRefresh={refresh}
+                    onExecution={openExecution}
+                  />
+                </div>
+              )}
+
+              {page === "overview" && (
+                <aside className="tile activity span-8">
+                  <div className="tile-head">
                     <div>
-                      <h3>เริ่มจากโปรเจกต์แรก</h3>
-                      <p className="hint">
-                        เลือก directory ผ่าน native dialog เพื่ออนุมัติ
-                        workspace
-                      </p>
+                      <h2>Activity</h2>
+                      <p>100 runs ล่าสุดในเครื่อง</p>
                     </div>
                   </div>
-                )}
-              </section>
-            )}
+                  <ActivityTabs groups={groups} />
+                </aside>
+              )}
 
-            {page === "themes" && (
-              <Themes
-                data={data}
-                states={crew}
-                theme={theme === "light" ? "light" : "dark"}
-                world={world}
-                onSelect={chooseWorld}
-              />
-            )}
+              {page === "overview" && (
+                <section
+                  className="tile waiting span-4"
+                  aria-label="งานที่รอคุณ"
+                >
+                  <div className="tile-head">
+                    <div>
+                      <h2>รอคุณตัดสิน</h2>
+                      <p>{waitingOnYou.length} ขั้นที่หยุดรอคุณ</p>
+                    </div>
+                  </div>
+                  {waitingOnYou.length ? (
+                    <ul className="waiting-list">
+                      {waitingOnYou.slice(0, 6).map((task) => (
+                        <li key={task.id}>
+                          <a
+                            href={pageHref("tasks")}
+                            onClick={(event) => openPage("tasks", event)}
+                          >
+                            <img
+                              className="agent-avatar"
+                              data-agent={task.agentId}
+                              src={`/crewbots/${task.agentId}/portrait.svg`}
+                              alt=""
+                              width="32"
+                              height="32"
+                            />
+                            <span>
+                              <b>
+                                {task.step === "task"
+                                  ? task.title
+                                  : (stepLabels[task.step] ?? task.title)}
+                              </b>
+                              <small>
+                                {agentName(data.agents, task.agentId)} ·{" "}
+                                {data.projects.find(
+                                  (item) => item.id === task.projectId,
+                                )?.name ?? "—"}
+                              </small>
+                            </span>
+                            <span className="chip" data-tone="wait">
+                              {statusLabels[task.status] ?? task.status}
+                            </span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="hint">ไม่มีงานรอคุณ ทีมเดินงานต่อได้เอง</p>
+                  )}
+                </section>
+              )}
 
-            {page === "storage" && <StoragePanel native={native} />}
-            {page === "brain" && <SecondBrainPanel native={native} />}
-            {page === "runtimes" && (
-              <Connectors
-                data={data}
-                diagnostics={diagnostics}
-                checking={checking}
-                native={native}
-                onCheck={() => void checkRuntimes()}
-              />
-            )}
+              {page === "projects" && (
+                <>
+                  <section className="tile span-12">
+                    <div className="tile-head">
+                      <div>
+                        <h2>Projects</h2>
+                        <p>{data.projects.length} workspaces ที่อนุมัติแล้ว</p>
+                      </div>
+                      <button disabled={!native} onClick={openProjectModal}>
+                        <span className="plus" aria-hidden="true">
+                          ＋
+                        </span>
+                        Add project
+                      </button>
+                    </div>
+                    {data.projects.length ? (
+                      <ul className="project-grid">
+                        {data.projects.map((project) => {
+                          const projectTasks = (data.tasks ?? []).filter(
+                            (task) => task.projectId === project.id,
+                          );
+                          const progress = progressOf(projectTasks);
+                          const flows = (data.workflows ?? []).filter(
+                            (flow) => flow.projectId === project.id,
+                          ).length;
+                          const runs = data.executions.filter(
+                            (item) => item.projectId === project.id,
+                          ).length;
+                          return (
+                            <li key={project.id} className="project-card">
+                              <div className="project-card-head">
+                                <h3>{project.name}</h3>
+                                <span className="chip">
+                                  {project.isGit ? "Git" : "Folder"}
+                                </span>
+                                {(project.folders?.length ?? 1) > 1 && (
+                                  <span className="chip">
+                                    {project.folders?.length} folders
+                                  </span>
+                                )}
+                              </div>
+                              <p className="project-goal">
+                                {project.goal || "ยังไม่ได้กำหนด objective"}
+                              </p>
+                              <code className="path">
+                                {displayPath(project.path)}
+                              </code>
+                              <div className="project-progress">
+                                <span className="meter" aria-hidden="true">
+                                  <span
+                                    style={{ width: `${progress.percent}%` }}
+                                  />
+                                </span>
+                                <span>
+                                  {progress.completed}/{progress.total} ขั้น ·{" "}
+                                  {progress.percent}%
+                                </span>
+                              </div>
+                              <dl className="project-stats">
+                                <div>
+                                  <dt>Workflow</dt>
+                                  <dd>{flows}</dd>
+                                </div>
+                                <div>
+                                  <dt>กำลังทำ</dt>
+                                  <dd>{progress.running}</dd>
+                                </div>
+                                <div>
+                                  <dt>รอคุณ</dt>
+                                  <dd>{progress.waiting}</dd>
+                                </div>
+                                <div>
+                                  <dt>Execution</dt>
+                                  <dd>{runs}</dd>
+                                </div>
+                              </dl>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : (
+                      <div className="empty">
+                        <img
+                          src="/crewbots/astra/portrait.svg"
+                          alt=""
+                          width="56"
+                          height="52"
+                        />
+                        <div>
+                          <h3>เริ่มจากโปรเจกต์แรก</h3>
+                          <p className="hint">
+                            เลือก directory ผ่าน native dialog เพื่ออนุมัติ
+                            workspace
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </section>
+                  <ProjectsOverview
+                    data={data}
+                    diagnostics={diagnostics}
+                    native={native}
+                  />
+                </>
+              )}
 
-            {native && page === "remote" && (
-              <div className="span-12 remote-slot">
-                <RemotePanel projects={data.projects} />
-              </div>
-            )}
+              {page === "themes" && (
+                <Themes
+                  data={data}
+                  states={crew}
+                  theme={theme === "light" ? "light" : "dark"}
+                  world={world}
+                  onSelect={chooseWorld}
+                />
+              )}
 
-            {page === "monitor" && (
-              <ReviewPage
-                data={data}
-                selectedRun={selectedRun}
-                onSelectRun={setSelectedRun}
-                events={events}
-                tab={monitorTab}
-                onTab={setMonitorTab}
-                onCancel={(id) => {
-                  void bridge
-                    .cancel(id)
-                    .then(() => setNotice("ส่ง cancellation request แล้ว"))
-                    .catch((cause) => setError(displayError(cause)));
-                }}
-                onRefresh={refresh}
-                onOpenQueue={() => openPage("tasks")}
-              />
-            )}
-          </main>
-        </div>
-      )}
+              {page === "storage" && <StoragePanel native={native} />}
+              {page === "brain" && <SecondBrainPanel native={native} />}
+              {page === "runtimes" && (
+                <Connectors
+                  data={data}
+                  diagnostics={diagnostics}
+                  checking={checking}
+                  native={native}
+                  onCheck={() => void checkRuntimes()}
+                />
+              )}
+
+              {native && page === "remote" && (
+                <div className="span-12 remote-slot">
+                  <RemotePanel projects={data.projects} />
+                </div>
+              )}
+
+              {page === "monitor" && (
+                <ReviewPage
+                  data={data}
+                  selectedRun={selectedRun}
+                  onSelectRun={setSelectedRun}
+                  events={events}
+                  tab={monitorTab}
+                  onTab={setMonitorTab}
+                  onCancel={(id) => {
+                    void bridge
+                      .cancel(id)
+                      .then(() => setNotice("ส่ง cancellation request แล้ว"))
+                      .catch((cause) => setError(displayError(cause)));
+                  }}
+                  onRefresh={refresh}
+                  onOpenQueue={() => openPage("tasks")}
+                />
+              )}
+            </main>
+          </div>
+        )}
       </div>
       {modal && (
         <Modal
@@ -747,8 +782,8 @@ export function App() {
                 />
                 <p className="hint">
                   เลือก folder ผ่าน native picker เป็นการอนุมัติ workspace;
-                  primary คือที่ agent ทำงาน folder อื่นเป็นบริบทแบบอ่านอย่างเดียว
-                  (1 folder ต่อ 1 git repo)
+                  primary คือที่ agent ทำงาน folder
+                  อื่นเป็นบริบทแบบอ่านอย่างเดียว (1 folder ต่อ 1 git repo)
                 </p>
               </fieldset>
               <div className="modal-actions">

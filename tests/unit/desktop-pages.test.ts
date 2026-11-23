@@ -61,6 +61,7 @@ describe("Astra Desktop navigation", () => {
         agents: ["5 โต๊ะงาน · 5 agents"],
         runtimes: ["Runtime ในเครื่อง"],
         themes: ["ธีมทั้งหมด"],
+        projects: ["Project flow", "Timeline"],
       };
       expect(sectionHeadings).toEqual([heading, ...(more[page] ?? [])]);
       expect(html.match(/aria-current="page"/g)).toHaveLength(1);

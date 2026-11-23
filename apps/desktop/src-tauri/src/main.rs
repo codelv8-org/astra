@@ -484,6 +484,28 @@ async fn execution_result(
 }
 
 #[tauri::command]
+async fn project_overview(
+    core: State<'_, Core>,
+    days: u32,
+) -> Result<crewnest_core::overview::Overview, String> {
+    let home = std::env::var_os("USERPROFILE")
+        .or_else(|| std::env::var_os("HOME"))
+        .ok_or("Home folder not found")?;
+    core.store.overview(std::path::Path::new(&home), days)
+}
+
+#[tauri::command]
+async fn link_session(
+    core: State<'_, Core>,
+    agent: String,
+    session_id: String,
+    project_id: Option<String>,
+) -> Result<(), String> {
+    core.store
+        .link_session(&agent, &session_id, project_id.as_deref())
+}
+
+#[tauri::command]
 async fn cancel_run(core: State<'_, Core>, execution_id: String) -> Result<(), String> {
     core.cancel(&execution_id)
 }
@@ -784,7 +806,9 @@ fn main() {
             scheduling,
             writing_info,
             configure_writing,
-            writing_action
+            writing_action,
+            project_overview,
+            link_session
         ])
         .run(tauri::generate_context!())
         .expect("Astra desktop failed");

@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 /// schema version ล่าสุดที่แอปนี้รู้จัก
-pub const SCHEMA_VERSION: i64 = 6;
+pub const SCHEMA_VERSION: i64 = 7;
 
 #[derive(Clone)]
 pub struct Store {
@@ -88,6 +88,10 @@ impl Store {
                 return Err(error.to_string());
             }
             db.execute_batch("COMMIT").map_err(|e| e.to_string())?;
+        }
+        if version < 7 {
+            db.execute_batch(include_str!("../migrations/007_session_links.sql"))
+                .map_err(|e| e.to_string())?;
         }
         let agents: Vec<serde_json::Value> =
             serde_json::from_str(include_str!("../../shared/default-agents.json"))

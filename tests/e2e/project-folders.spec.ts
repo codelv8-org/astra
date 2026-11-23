@@ -28,6 +28,8 @@ test.beforeEach(async ({ page }) => {
       invoke: async (cmd, args) => {
         fixture.fixtureCalls.push({ cmd, args });
         if (cmd === "snapshot") return structuredClone(snapshot);
+        if (cmd === "project_overview")
+          return { since: new Date().toISOString(), sessions: [], commits: [], events: [] };
         if (cmd === "remote_status")
           return { connection: "not_configured", deviceId: null, server: null, shared: [] };
         if (cmd === "diagnostics") return [];

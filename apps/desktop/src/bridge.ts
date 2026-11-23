@@ -1,6 +1,7 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import type { WritingInfo } from "./WritingPanel";
 import type { ExecutionResult } from "./executionResult";
+import type { Overview } from "./projectFlow";
 import type {
   QueueTask,
   Workflow,
@@ -108,4 +109,8 @@ export const bridge = {
   executionResult: (executionId: string, projectId: string) =>
     call<ExecutionResult>("execution_result", { executionId, projectId }),
   cancel: (executionId: string) => call<void>("cancel_run", { executionId }),
+  projectOverview: (days: number) =>
+    call<Overview>("project_overview", { days }),
+  linkSession: (agent: string, sessionId: string, projectId: string | null) =>
+    call<void>("link_session", { agent, sessionId, projectId }),
 };

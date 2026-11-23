@@ -109,6 +109,8 @@ test.beforeEach(async ({ page }) => {
                   createdAt: new Date().toISOString(),
                 },
               ];
+        if (cmd === "project_overview")
+          return { since: new Date().toISOString(), sessions: [], commits: [], events: [] };
         throw new Error(`Unexpected fixture command: ${cmd}`);
       },
     };
