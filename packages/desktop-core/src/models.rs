@@ -51,6 +51,34 @@ pub struct ExecutionEvent {
     pub created_at: String,
 }
 
+/// Who caused a task event; every writer must name one (no default).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Initiator {
+    Owner,
+    Remote(String),
+    Scheduler,
+    Handoff(String),
+    System,
+}
+
+impl Initiator {
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Self::Owner => "owner",
+            Self::Remote(_) => "remote",
+            Self::Scheduler => "scheduler",
+            Self::Handoff(_) => "handoff",
+            Self::System => "system",
+        }
+    }
+    pub fn reference(&self) -> Option<&str> {
+        match self {
+            Self::Remote(r) | Self::Handoff(r) => Some(r),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExecutionResult {
@@ -161,4 +189,6 @@ pub struct TaskEvent {
     pub kind: String,
     pub text: String,
     pub created_at: String,
+    pub initiator: String,
+    pub initiator_ref: Option<String>,
 }

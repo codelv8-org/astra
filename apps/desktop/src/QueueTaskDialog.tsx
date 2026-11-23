@@ -8,6 +8,7 @@ import { Modal } from "../../../packages/ui/src/Modal";
 import { bridge } from "./bridge";
 import { WritingPanel } from "./WritingPanel";
 import { readExecutionResult } from "./executionResult";
+import { initiatorLabel } from "./initiator";
 
 export function QueueTaskDialog({
   task: selected,
@@ -258,7 +259,8 @@ export function QueueTaskDialog({
       <div className="task-history">
         {events.map((e) => (
           <p key={e.id}>
-            <b>{e.kind}</b> · {e.text}
+            <b>{e.kind}</b> · {e.text}{" "}
+            <span className="task-initiator">· สั่งโดย {initiatorLabel(e)}</span>
           </p>
         ))}
       </div>

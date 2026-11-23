@@ -309,7 +309,7 @@ async fn start_run(
 
 #[tauri::command]
 async fn create_task(core: State<'_, Core>, input: TaskInput) -> Result<Task, String> {
-    core.store.create_task(input)
+    core.store.create_task(input, &Initiator::Owner)
 }
 
 #[tauri::command]
@@ -372,14 +372,7 @@ async fn queue_action(
         "review_evidence" => core
             .store
             .set_review_evidence(&task_id, note.as_deref().unwrap_or("")),
-        "cancel" => {
-            if task.status == "running" {
-                let run = task.last_execution_id.ok_or("No active execution")?;
-                core.cancel(&run)
-            } else {
-                core.store.cancel_pending_task(&task_id)
-            }
-        }
+        "cancel" => core.cancel_task(&task, &Initiator::Owner),
         "accept_review" | "rework" => core.store.review_task(
             &task_id,
             action == "accept_review",

@@ -747,7 +747,7 @@ mod tests {
                 priority: 50,
                 timeout_seconds: 30,
                 retry_limit: 0,
-            })
+            }, &crate::models::Initiator::Owner)
             .unwrap();
         store
             .configure_writing(&task.id, vec!["example.mjs".into()])

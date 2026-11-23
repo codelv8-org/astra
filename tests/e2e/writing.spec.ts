@@ -77,6 +77,7 @@ test("writing IPC fixture requires content review and exact digest before apply"
                   kind: "patch_applied",
                   text: "FIXTURE ONLY: refreshed without reopening",
                   createdAt: "2026-11-18",
+                  initiator: "owner",
                 },
               ]
             : [];

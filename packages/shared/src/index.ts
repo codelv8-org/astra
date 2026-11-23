@@ -169,4 +169,6 @@ export interface TaskEvent {
   kind: string;
   text: string;
   createdAt: string;
+  initiator: string;
+  initiatorRef?: string | null;
 }

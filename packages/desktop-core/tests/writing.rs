@@ -22,7 +22,7 @@ fn setup() -> (tempfile::TempDir, Store, String, String) {
             priority: 50,
             timeout_seconds: 30,
             retry_limit: 2,
-        })
+        }, &crewnest_core::models::Initiator::Owner)
         .unwrap()
         .id;
     (dir, store, project, task)

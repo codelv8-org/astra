@@ -361,6 +361,9 @@
   padding: 7px 0;
   border-bottom: 1px solid var(--hair);
 }
+.task-initiator {
+  color: var(--ink-2);
+}
 .modal-actions.start,
 .tile-actions.start {
   justify-content: flex-start;

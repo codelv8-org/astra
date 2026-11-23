@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 /// schema version ล่าสุดที่แอปนี้รู้จัก
-pub const SCHEMA_VERSION: i64 = 5;
+pub const SCHEMA_VERSION: i64 = 6;
 
 #[derive(Clone)]
 pub struct Store {
@@ -72,6 +72,17 @@ impl Store {
                 .map_err(|e| e.to_string())?;
             if let Err(error) =
                 db.execute_batch(include_str!("../migrations/005_project_folders.sql"))
+            {
+                let _ = db.execute_batch("ROLLBACK");
+                return Err(error.to_string());
+            }
+            db.execute_batch("COMMIT").map_err(|e| e.to_string())?;
+        }
+        if version < 6 {
+            db.execute_batch("BEGIN IMMEDIATE")
+                .map_err(|e| e.to_string())?;
+            if let Err(error) =
+                db.execute_batch(include_str!("../migrations/006_task_event_initiator.sql"))
             {
                 let _ = db.execute_batch("ROLLBACK");
                 return Err(error.to_string());

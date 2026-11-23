@@ -58,7 +58,7 @@ fn migration_from_schema1_preserves_runs_and_agent_customization() {
             .unwrap()
             .pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))
             .unwrap(),
-        5
+        crewnest_core::store::SCHEMA_VERSION
     );
     assert!(store.scheduler_paused().unwrap());
 }
@@ -66,24 +66,24 @@ fn migration_from_schema1_preserves_runs_and_agent_customization() {
 #[test]
 fn dependencies_gate_approval_and_cross_project_links() {
     let (_dir, core, project) = setup();
-    let first = core.store.create_task(input(&project)).unwrap();
+    let first = core.store.create_task(input(&project), &Initiator::Owner).unwrap();
     let mut second = input(&project);
     second.dependencies = vec![first.id.clone()];
-    let second = core.store.create_task(second).unwrap();
+    let second = core.store.create_task(second, &Initiator::Owner).unwrap();
     assert!(core.store.approve_task(&second.id).is_err());
     assert!(core
         .store
         .create_task(TaskInput {
             dependencies: vec!["unknown".into()],
             ..input(&project)
-        })
+        }, &Initiator::Owner)
         .is_err());
     assert!(core
         .store
         .create_task(TaskInput {
             retry_limit: 3,
             ..input(&project)
-        })
+        }, &Initiator::Owner)
         .is_err());
     core.store.approve_task(&first.id).unwrap();
     let run = core
@@ -99,7 +99,7 @@ fn dependencies_gate_approval_and_cross_project_links() {
 #[test]
 fn authorization_binds_payload_handoff_and_instructions() {
     let (_dir, core, project) = setup();
-    let task = core.store.create_task(input(&project)).unwrap();
+    let task = core.store.create_task(input(&project), &Initiator::Owner).unwrap();
     assert!(core
         .store
         .begin_run(&request(&core.store, &task.id), "mock")
@@ -125,7 +125,7 @@ fn authorization_binds_payload_handoff_and_instructions() {
 #[test]
 fn retries_are_bounded_require_approval_and_do_not_replay_old_result() {
     let (_dir, core, project) = setup();
-    let task = core.store.create_task(input(&project)).unwrap();
+    let task = core.store.create_task(input(&project), &Initiator::Owner).unwrap();
     for attempt in 0..3 {
         if attempt > 0 {
             core.store.retry_task(&task.id).unwrap();
@@ -149,9 +149,9 @@ fn retries_are_bounded_require_approval_and_do_not_replay_old_result() {
 #[test]
 fn cancellation_of_pending_tasks_never_dispatches() {
     let (_dir, core, project) = setup();
-    let task = core.store.create_task(input(&project)).unwrap();
+    let task = core.store.create_task(input(&project), &Initiator::Owner).unwrap();
     core.store.approve_task(&task.id).unwrap();
-    core.store.cancel_pending_task(&task.id).unwrap();
+    core.store.cancel_pending_task(&task.id, &Initiator::Owner).unwrap();
     assert!(core
         .store
         .begin_run(&request(&core.store, &task.id), "mock")
@@ -229,7 +229,7 @@ fn workflow_rework_is_bounded_and_human_uat_remains_guarded() {
 #[tokio::test]
 async fn queue_pause_dispatch_locks_and_cancel_real_mock_execution() {
     let (_dir, core, project) = setup();
-    let task = core.store.create_task(input(&project)).unwrap();
+    let task = core.store.create_task(input(&project), &Initiator::Owner).unwrap();
     core.store.approve_task(&task.id).unwrap();
     assert!(core.scheduler_tick().await.unwrap().is_none());
     core.store.set_scheduler_paused(false).unwrap();
@@ -452,4 +452,70 @@ fn native_writing_template_keeps_apply_dependency_and_evidence_approval_guards()
         .set_review_evidence(&scout.id, "approval must not be changed")
         .is_err());
     assert!(core.store.approve_task(&uat.id).is_err());
+}
+
+#[test]
+fn legacy_task_events_read_as_unknown() {
+    let (_d, core, project) = setup();
+    let task = core.store.create_task(input(&project), &Initiator::Owner).unwrap();
+    // emulate a schema-5 database that already holds an event row, then reopen to migrate
+    core.store
+        .connect()
+        .unwrap()
+        .execute_batch(&format!(
+            "ALTER TABLE task_events DROP COLUMN initiator; ALTER TABLE task_events DROP COLUMN initiator_ref;              DELETE FROM schema_migrations WHERE version=6; PRAGMA user_version=5;              INSERT INTO task_events(task_id,kind,text,created_at) VALUES('{}','legacy','old row','2026-01-01');",
+            task.id
+        ))
+        .unwrap();
+    let reopened = Store::open(&core.store.path).unwrap();
+    let legacy = reopened
+        .task_events(&task.id)
+        .unwrap()
+        .into_iter()
+        .find(|e| e.kind == "legacy")
+        .unwrap();
+    assert_eq!(legacy.initiator, "unknown");
+    assert_eq!(legacy.initiator_ref, None);
+}
+
+#[test]
+fn owner_actions_are_attributed_to_owner() {
+    let (_d, core, project) = setup();
+    let task = core.store.create_task(input(&project), &Initiator::Owner).unwrap();
+    core.store.cancel_pending_task(&task.id, &Initiator::Owner).unwrap();
+    let events = core.store.task_events(&task.id).unwrap();
+    assert!(events.iter().any(|e| e.kind == "canceled"));
+    assert!(events.iter().all(|e| e.initiator == "owner" && e.initiator_ref.is_none()));
+}
+
+#[tokio::test]
+async fn scheduler_dispatch_is_recorded_before_start() {
+    let (_d, core, project) = setup();
+    let task = core.store.create_task(input(&project), &Initiator::Owner).unwrap();
+    core.store.approve_task(&task.id).unwrap();
+    core.store.set_scheduler_paused(false).unwrap();
+    let run = core.scheduler_tick().await.unwrap().unwrap();
+    let events = core.store.task_events(&task.id).unwrap();
+    let dispatch = events.iter().find(|e| e.kind == "dispatch_requested").unwrap();
+    let started = events.iter().find(|e| e.kind == "execution_started").unwrap();
+    assert_eq!(dispatch.initiator, "scheduler");
+    assert_eq!(started.initiator, "system");
+    assert!(dispatch.id < started.id);
+    core.cancel(&run).unwrap();
+}
+
+#[tokio::test]
+async fn owner_cancel_of_running_task_is_attributed() {
+    let (_d, core, project) = setup();
+    let task = core.store.create_task(input(&project), &Initiator::Owner).unwrap();
+    core.store.approve_task(&task.id).unwrap();
+    core.store.set_scheduler_paused(false).unwrap();
+    let run = core.scheduler_tick().await.unwrap().unwrap();
+    let running = core.store.task(&task.id).unwrap();
+    assert_eq!(running.status, "running");
+    core.cancel_task(&running, &Initiator::Owner).unwrap();
+    let events = core.store.task_events(&task.id).unwrap();
+    let cancel = events.iter().find(|e| e.kind == "cancel_requested").unwrap();
+    assert_eq!(cancel.initiator, "owner");
+    assert_eq!(cancel.text, run);
 }

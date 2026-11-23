@@ -17,7 +17,7 @@ fn v4_projects_backfilled_as_primary() {
         .connect()
         .unwrap()
         .execute_batch(
-            "DROP TABLE project_folders; DELETE FROM schema_migrations WHERE version=5; PRAGMA user_version=4;",
+            "DROP TABLE project_folders; ALTER TABLE task_events DROP COLUMN initiator; ALTER TABLE task_events DROP COLUMN initiator_ref; DELETE FROM schema_migrations WHERE version>=5; PRAGMA user_version=4;",
         )
         .unwrap();
     let reopened = Store::open(&store.path).unwrap();

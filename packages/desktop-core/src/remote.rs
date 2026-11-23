@@ -1,4 +1,7 @@
-use crate::{models::TaskInput, redact, Core, Result};
+use crate::{
+    models::{Initiator, TaskInput},
+    redact, Core, Result,
+};
 use chrono::{DateTime, Utc};
 use futures_util::{SinkExt, StreamExt};
 use rusqlite::{params, OptionalExtension};
@@ -309,11 +312,33 @@ impl Core {
             }
             db.execute("INSERT INTO remote_commands VALUES(?1,?2,?3,'claimed','Interrupted command; no automatic replay')",params![c.command_id,c.idempotency_key,envelope]).map_err(|e|e.to_string())?;
         }
+        // record on an existing task of a shared project before acting; submit gets its
+        // "created" event instead. Best-effort: attribution must never block or relabel a command.
+        let by = Initiator::Remote(c.device_id.clone());
+        let shared = self.remote_shared().unwrap_or_default();
+        let existing = self
+            .local_remote_id(&c.task_id)
+            .ok()
+            .filter(|id| {
+                self.store.task(id).is_ok_and(|t| t.project_id == c.project_id)
+                    && shared.iter().any(|p| p["projectId"] == c.project_id)
+            });
+        if let Some(id) = &existing {
+            let _ = self.store.task_event(
+                id,
+                "remote_command",
+                &format!("{} · {}", c.action, c.command_id),
+                &by,
+            );
+        }
         let result = self.remote_effect(&c).await;
         let (state, detail) = match result {
             Ok(s) => ("accepted", s),
             Err(e) => ("rejected", self.remote_safe(&e)),
         };
+        if let (Some(id), "rejected") = (&existing, state) {
+            let _ = self.store.task_event(id, "remote_rejected", &detail, &by);
+        }
         self.store
             .connect()?
             .execute(
@@ -364,7 +389,7 @@ impl Core {
                     priority: 50,
                     timeout_seconds: 120,
                     retry_limit: 2,
-                })?;
+                }, &Initiator::Remote(c.device_id.clone()))?;
                 self.store
                     .connect()?
                     .execute(
@@ -401,15 +426,7 @@ impl Core {
                 if t.project_id != c.project_id {
                     return Err("Project mismatch".into());
                 }
-                if t.status == "running" {
-                    self.cancel(
-                        t.last_execution_id
-                            .as_deref()
-                            .ok_or("No active execution")?,
-                    )?;
-                } else {
-                    self.store.cancel_pending_task(&id)?;
-                }
+                self.cancel_task(&t, &Initiator::Remote(c.device_id.clone()))?;
                 Ok("Cancellation requested".into())
             }
             _ => Err("Remote action denied by local policy".into()),

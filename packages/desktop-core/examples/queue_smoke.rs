@@ -38,8 +38,8 @@ async fn main() -> Result<(), String> {
         priority: 60,
         timeout_seconds: 120,
         retry_limit: 0,
-    })?;
-    let second=store.create_task(TaskInput{project_id:project.id,agent_id:"scout".into(),adapter:"codex".into(),title:"SCOUT synthetic handoff verification".into(),prompt:"Do not use tools, files or commands. Read predecessor handoff text, then reply only with the marker it contains plus VERIFIED.".into(),dependencies:vec![first.id.clone()],priority:50,timeout_seconds:120,retry_limit:0})?;
+    }, &crewnest_core::models::Initiator::Owner)?;
+    let second=store.create_task(TaskInput{project_id:project.id,agent_id:"scout".into(),adapter:"codex".into(),title:"SCOUT synthetic handoff verification".into(),prompt:"Do not use tools, files or commands. Read predecessor handoff text, then reply only with the marker it contains plus VERIFIED.".into(),dependencies:vec![first.id.clone()],priority:50,timeout_seconds:120,retry_limit:0}, &crewnest_core::models::Initiator::Owner)?;
     assert!(store.approve_task(&second.id).is_err());
     store.set_scheduler_paused(false)?;
     for task in [&first, &second] {

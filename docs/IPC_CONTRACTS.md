@@ -29,3 +29,7 @@ Renderer เรียกเฉพาะ Tauri commands ผ่าน `apps/deskto
 Frontend Zod validation อยู่ packages/shared Rust RunRequest ใช้ deny_unknown_fields ไม่รับ executable/args/script จาก frontend Event `execution-event` emit หลัง persist แต่ UI ใช้ cursor polling เพื่อ recover missed events
 
 Remote protocol schema อยู่ packages/protocol สำหรับ Phase 3 เท่านั้น ยังไม่มี transport, session auth, device credentials, authorization, expiry execution handler หรือ exactly-once delivery implementation
+
+## ผู้สั่งในไทม์ไลน์งาน (schema 6)
+
+`queue_events` คืน `TaskEvent` ที่มี `initiator` (`owner` | `remote` | `scheduler` | `handoff` | `system` | `unknown`) และ `initiatorRef` (device id ของ remote, task id ต้นทางของ handoff, อื่นๆ null) แถวที่มีก่อน schema 6 เป็น `unknown` Core บังคับให้ทุกจุดที่เขียน event ระบุผู้สั่ง ตัวจัดคิวเขียน `dispatch_requested` และ remote เขียน `remote_command` ก่อนลงมือ (และ `remote_rejected` เมื่อถูกปฏิเสธ) ส่วน `execution_started`/`execution_finished` เป็น `system` เพราะ Core สังเกตผลเอง ดู `docs/superpowers/specs/2026-11-22-task-event-initiator-design.md`

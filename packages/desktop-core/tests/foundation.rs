@@ -38,7 +38,7 @@ fn migrations_seed_and_persistence_are_idempotent() {
         db.query_row("SELECT COUNT(*) FROM schema_migrations", [], |r| r
             .get::<_, i32>(0))
             .unwrap(),
-        5
+        6
     );
 }
 
@@ -95,7 +95,7 @@ fn newer_schema_is_not_downgraded() {
     store
         .connect()
         .unwrap()
-        .pragma_update(None, "user_version", 6)
+        .pragma_update(None, "user_version", 7)
         .unwrap();
     assert!(Store::open(&store.path).is_err());
 }
